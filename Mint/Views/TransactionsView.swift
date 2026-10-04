@@ -20,20 +20,6 @@ enum HistoryItem: Identifiable {
         }
     }
 
-    var day: Date {
-        switch self {
-        case .entry(let entry): entry.sortDate
-        case .adjustment(let adjustment): adjustment.day
-        }
-    }
-
-    var createdAt: Date {
-        switch self {
-        case .entry(let entry): entry.createdAt
-        case .adjustment(let adjustment): adjustment.createdAt
-        }
-    }
-
     var entry: Entry? {
         if case .entry(let entry) = self { entry } else { nil }
     }
@@ -121,13 +107,13 @@ struct TransactionsView: View {
                 }
 
                 if showsLater {
-                    ForEach(laterByMonth(later), id: \.month) { group in
+                    ForEach(groupedByMonth(later, day: \.day), id: \.month) { group in
                         TitledSection(laterTitle(group.month)) {
-                            Text(Money.format(group.steps.reduce(0) { $0 + $1.item.signedCents }, showPlus: true))
+                            Text(Money.format(group.items.reduce(0) { $0 + $1.item.signedCents }, showPlus: true))
                                 .monospacedDigit()
                                 .foregroundStyle(.secondary)
                         } content: {
-                            upcomingRows(group.steps, showsBalance: showsBalance)
+                            upcomingRows(group.items, showsBalance: showsBalance)
                         }
                     }
                 }
@@ -200,17 +186,18 @@ struct TransactionsView: View {
         return "Later in \(month.formatted(.dateTime.month(.wide)))"
     }
 
-    /// Groups upcoming items past the next four weeks by month. Expects them in date order.
-    private func laterByMonth(_ steps: [ForecastStep<LedgerEntry>]) -> [(month: Date, steps: [ForecastStep<LedgerEntry>])] {
-        var groups: [(month: Date, steps: [ForecastStep<LedgerEntry>])] = []
-        for step in steps {
-            if let last = groups.last, ledger.calendar.isDate(step.day, equalTo: last.month, toGranularity: .month) {
-                groups[groups.count - 1].steps.append(step)
+    /// Groups items by month, keeping their order. Expects them sorted by `day`, either way.
+    private func groupedByMonth<Item>(_ items: [Item], day: (Item) -> Date) -> [(month: Date, items: [Item])] {
+        var groups: [(month: DateInterval, items: [Item])] = []
+        for item in items {
+            let day = day(item)
+            if let last = groups.last, last.month.contains(day) {
+                groups[groups.count - 1].items.append(item)
             } else {
-                groups.append((ledger.calendar.dateInterval(of: .month, for: step.day)?.start ?? step.day, [step]))
+                groups.append((ledger.calendar.dateInterval(of: .month, for: day) ?? DateInterval(start: day, duration: 0), [item]))
             }
         }
-        return groups
+        return groups.map { ($0.month.start, $0.items) }
     }
 
     /// Paid entries and adjustments, newest first, grouped by month.
@@ -232,15 +219,7 @@ struct TransactionsView: View {
             .map { (item: HistoryItem.adjustment($0), day: ledger.day($0.day), createdAt: $0.createdAt) }
         let sorted = (paid + adjusted)
             .sorted { $0.day != $1.day ? $0.day > $1.day : $0.createdAt > $1.createdAt }
-        var groups: [(month: Date, items: [HistoryItem])] = []
-        for (item, day, _) in sorted {
-            if let last = groups.last, day >= last.month {
-                groups[groups.count - 1].items.append(item)
-            } else {
-                groups.append((ledger.calendar.dateInterval(of: .month, for: day)?.start ?? day, [item]))
-            }
-        }
-        return groups
+        return groupedByMonth(sorted, day: \.day).map { ($0.month, $0.items.map(\.item)) }
     }
 
     /// A month's net, like "+$1,200.00", counting entries but not adjustments. `nil` if no entries.

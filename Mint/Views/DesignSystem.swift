@@ -10,7 +10,7 @@ import SwiftUI
 
 /// How things move. With Reduce Motion on in System Settings, changes happen at once instead.
 enum Motion {
-    static var isReduced: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    private static var isReduced: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
     /// For changes to the data: rows, amounts, bars and the chart.
     static var standard: Animation? { isReduced ? nil : .snappy(duration: 0.35) }
@@ -32,7 +32,7 @@ enum Theme {
     /// Row divider inset, so dividers start after the icon.
     static let rowDividerInset: CGFloat = 60
 
-    // Status text: red unpaid, yellow scheduled, green paid. Deeper than the system fills in light
+    // Status text: red unpaid, amber scheduled, green paid. Deeper than the system fills in light
     // mode so small type stays readable.
     static let unpaidText = dynamic(light: NSColor(srgbRed: 0.77, green: 0.09, blue: 0.11, alpha: 1), dark: NSColor(srgbRed: 1, green: 0.45, blue: 0.42, alpha: 1))
     static let scheduledText = dynamic(light: NSColor(srgbRed: 0.54, green: 0.35, blue: 0, alpha: 1), dark: .systemYellow)
@@ -117,9 +117,9 @@ struct Page<Content: View>: View {
 /// A heading over its content, with room for something small on the right.
 struct TitledSection<Accessory: View, Content: View>: View {
     let title: String
-    var tint: Color = .primary
-    @ViewBuilder var accessory: Accessory
-    @ViewBuilder var content: Content
+    let tint: Color
+    let accessory: Accessory
+    let content: Content
 
     init(
         _ title: String,

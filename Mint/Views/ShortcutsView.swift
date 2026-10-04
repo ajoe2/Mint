@@ -37,7 +37,7 @@ struct ShortcutsView: View {
             ("Change status and dates", ["Space", "⌘I"]),
             ("Mark as paid, or unpaid", ["⇧⌘C"]),
             ("Duplicate", ["⌘D"]),
-            ("Delete", ["⌫"]),
+            ("Delete", ["⌫", "⌘⌫"]),
             ("Delete this and future repeats", ["⌥⌘⌫"]),
             ("Clear the selection", ["Esc"]),
             ("Next or previous filter, in Transactions", ["→", "←"]),

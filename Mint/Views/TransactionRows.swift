@@ -126,11 +126,11 @@ struct EntryRowView<Trailing: View>: View {
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { actions.edit(entry) }
         .accessibilityAction(named: "Change Status") { isChangingStatus.wrappedValue = true }
-        .accessibilityAction(named: ledger.status(of: entry) == .paid
+        .accessibilityAction(named: mark.status == .paid
             ? EntryActions.uncompleteTitle(for: entry.kind)
             : EntryActions.completeTitle(for: entry.kind)
         ) {
-            if ledger.status(of: entry) == .paid { actions.uncomplete(entry) } else { actions.complete(entry) }
+            if mark.status == .paid { actions.uncomplete(entry) } else { actions.complete(entry) }
         }
     }
 

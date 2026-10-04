@@ -25,6 +25,7 @@ struct OverviewView: View {
     /// Coming up goes beside This month only when it gets at least this much room.
     private static let comingUpMinWidth: CGFloat = 420
     private static let thisMonthWidth: CGFloat = 340
+    private static let columnSpacing: CGFloat = 20
 
     var body: some View {
         let today = ledger.today
@@ -37,6 +38,7 @@ struct OverviewView: View {
         let comingUpEnd = ledger.addingDays(Ledger.comingUpDays, to: today)
         let inFourWeeks = points.last { $0.isProjected && $0.day <= comingUpEnd }?.cents ?? balance
         let lowest = ledger.lowestBalance(in: points) ?? BalancePoint(day: today, cents: balance, isProjected: false)
+        let isLow = lowest.cents < lowBalanceLimit
         let forecast = ledger.forecast(entries)
         // Overdue entries get their own section. Everything else expected in the next four weeks,
         // scheduled or just due, goes in Coming up with the balance after it.
@@ -49,12 +51,12 @@ struct OverviewView: View {
                     balance: balance,
                     inFourWeeks: inFourWeeks,
                     lowest: lowest,
-                    isLow: lowest.cents < lowBalanceLimit,
+                    isLow: isLow,
                     points: points,
                     ledger: ledger
                 )
 
-                if lowest.cents < lowBalanceLimit {
+                if isLow {
                     Label {
                         Text(lowBalanceWarning(lowest))
                     } icon: {
@@ -72,7 +74,7 @@ struct OverviewView: View {
                 }
 
                 // One layout or the other, so each section is built once.
-                let layout = isWide ? AnyLayout(HStackLayout(alignment: .top, spacing: 20)) : AnyLayout(VStackLayout(spacing: 20))
+                let layout = isWide ? AnyLayout(HStackLayout(alignment: .top, spacing: Self.columnSpacing)) : AnyLayout(VStackLayout(spacing: Self.columnSpacing))
                 layout {
                     comingUpSection(comingUp)
                     ThisMonthCard(entries: entries, ledger: ledger)
@@ -83,7 +85,7 @@ struct OverviewView: View {
         // Measured on the page, which is as wide as the window, so the page itself never has to
         // be wider than the window for the columns to fit side by side.
         .onGeometryChange(for: Bool.self) {
-            Page<EmptyView>.contentWidth(in: $0.size.width) >= Self.comingUpMinWidth + 20 + Self.thisMonthWidth
+            Page<EmptyView>.contentWidth(in: $0.size.width) >= Self.comingUpMinWidth + Self.columnSpacing + Self.thisMonthWidth
         } action: { isWide = $0 }
         .keyboardRows((overdue + comingUp.map(\.item)).map(\.entry), selection: selection, ledger: ledger)
     }
@@ -188,21 +190,18 @@ private struct BalancePanel: View {
     private var outlook: some View {
         let change = inFourWeeks - balance
         let lowestDay = DayText.short(lowest.day, today: ledger.today, calendar: ledger.calendar)
-        return (
-            Text("In 4 weeks ").foregroundStyle(.secondary)
-            + Text(Money.format(inFourWeeks)).fontWeight(.semibold)
-            + Text(change == 0 ? "" : " (\(Money.format(change, showPlus: true)))").foregroundStyle(.secondary)
-            + Text("  ·  ").foregroundStyle(.tertiary)
-            + Text("Lowest ").foregroundStyle(.secondary)
-            + Text(Money.format(lowest.cents)).fontWeight(.semibold).foregroundStyle(isLow ? Theme.unpaidText : Color.primary)
-            + Text(" (\(lowestDay))").foregroundStyle(.secondary)
-        )
-        .font(.callout)
-        .monospacedDigit()
-        .lineLimit(1)
-        .contentTransition(.numericText())
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("In 4 weeks \(Money.format(inFourWeeks)), lowest ahead \(Money.format(lowest.cents)) on \(lowestDay)")
+        let ahead = Text(Money.format(inFourWeeks)).fontWeight(.semibold).foregroundStyle(.primary)
+        let changeText = Text(change == 0 ? "" : " (\(Money.format(change, showPlus: true)))")
+        let separator = Text("  ·  ").foregroundStyle(.tertiary)
+        let low = Text(Money.format(lowest.cents)).fontWeight(.semibold).foregroundStyle(isLow ? Theme.unpaidText : Color.primary)
+        return Text("In 4 weeks \(ahead)\(changeText)\(separator)Lowest \(low) (\(lowestDay))")
+            .foregroundStyle(.secondary)
+            .font(.callout)
+            .monospacedDigit()
+            .lineLimit(1)
+            .contentTransition(.numericText())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("In 4 weeks \(Money.format(inFourWeeks)), lowest ahead \(Money.format(lowest.cents)) on \(lowestDay)")
     }
 }
 

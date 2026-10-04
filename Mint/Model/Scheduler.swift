@@ -11,9 +11,9 @@ import SwiftData
 /// Starting, extending, editing, and ending repeating series.
 enum Scheduler {
     /// Repeating entries are created this many days ahead.
-    static let horizonDays = 365
+    private static let horizonDays = 365
 
-    static func horizon(from today: Date, calendar: Calendar = .current) -> Date {
+    private static func horizon(from today: Date, calendar: Calendar = .current) -> Date {
         calendar.date(byAdding: .day, value: horizonDays, to: calendar.startOfDay(for: today)) ?? today
     }
 
@@ -34,7 +34,7 @@ enum Scheduler {
         undoManager?.disableUndoRegistration()
         let limit = horizon(from: today, calendar: calendar)
         let created = all.reduce(0) { $0 + $1.createOccurrences(through: limit, in: context, calendar: calendar) }
-        try? context.save()
+        context.saveNow()
         undoManager?.enableUndoRegistration()
         if created > 0 {
             undoManager?.removeAllActions()
@@ -130,7 +130,7 @@ enum Scheduler {
 
     /// Where `entry` falls in `series`. Older occurrences without a stored place are matched by
     /// date; `nil` if none matches (for example, one that was moved).
-    static func place(of entry: Entry, in series: RecurringSeries, calendar: Calendar) -> Int? {
+    private static func place(of entry: Entry, in series: RecurringSeries, calendar: Calendar) -> Int? {
         if let index = entry.occurrenceIndex { return index }
         guard let day = primaryDay(of: entry, calendar: calendar) else { return nil }
         let count = series.entries?.count ?? 0

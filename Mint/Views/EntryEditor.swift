@@ -216,7 +216,7 @@ struct EntryEditor: View {
 
         case .edit(let entry):
             // Undo can delete the entry while its editor is open.
-            guard entry.modelContext != nil, !entry.isDeleted, draft != original else {
+            guard route.isAvailable, draft != original else {
                 dismiss()
                 return
             }
@@ -247,7 +247,7 @@ struct EntryEditor: View {
     }
 
     private func delete() {
-        guard let entry = editedEntry, entry.modelContext != nil, !entry.isDeleted else {
+        guard let entry = editedEntry, route.isAvailable else {
             dismiss()
             return
         }

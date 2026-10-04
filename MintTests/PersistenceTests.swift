@@ -16,7 +16,7 @@ import Testing
 /// A class, so `deinit` can delete each test's store when it finishes.
 @MainActor
 final class PersistenceTests {
-    let schema = Schema([Entry.self, RecurringSeries.self, BalanceAdjustment.self])
+    let schema = Schema(AppEnvironment.models)
     /// Holds the store and the files SQLite keeps beside it.
     let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let container: ModelContainer

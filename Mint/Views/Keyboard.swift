@@ -198,7 +198,7 @@ struct EntryCommands: Commands {
     }
 
     private var toggleTitle: String {
-        guard let selected else { return "Mark as Paid Today" }
+        guard let selected else { return EntryActions.completeTitle(for: .spend) }
         return selected.isPaid
             ? EntryActions.uncompleteTitle(for: selected.entry.kind)
             : EntryActions.completeTitle(for: selected.entry.kind)

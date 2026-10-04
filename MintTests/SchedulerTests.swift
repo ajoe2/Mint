@@ -15,7 +15,6 @@ import Testing
 @MainActor
 struct SchedulerTests {
     let context: ModelContext
-    let calendar = Calendar.current
     let today = day(2026, 10, 15)
 
     init() throws {
@@ -36,12 +35,18 @@ struct SchedulerTests {
     private func monthlyRent(from date: Date) -> Entry {
         let rent = Entry(kind: .spend, title: "Rent", amountCents: 1_500_00, date: date, category: "Housing")
         context.insert(rent)
-        Scheduler.startSeries(with: rent, frequency: .monthly, endDate: nil, in: context, today: today, calendar: calendar)
+        Scheduler.startSeries(with: rent, frequency: .monthly, endDate: nil, in: context, today: today)
         return rent
     }
 
     private func occurrence(on date: Date) throws -> Entry {
         try #require(try entries().first { $0.date == date })
+    }
+
+    private func saveForFuture(_ entry: Entry, _ change: (inout EntryDraft) -> Void) {
+        var draft = EntryDraft(entry: entry, today: today)
+        change(&draft)
+        Scheduler.updateThisAndFuture(entry, with: draft, in: context, today: today)
     }
 
     @Test func startingASeriesFillsAYearAhead() throws {
@@ -78,7 +83,7 @@ struct SchedulerTests {
     @Test func dueDateOnlyRepeatsStayUnpaid() throws {
         let phone = Entry(kind: .spend, title: "Phone", amountCents: 65_00, date: nil, dueDate: day(2026, 10, 22))
         context.insert(phone)
-        Scheduler.startSeries(with: phone, frequency: .monthly, endDate: day(2026, 12, 31), in: context, today: today, calendar: calendar)
+        Scheduler.startSeries(with: phone, frequency: .monthly, endDate: day(2026, 12, 31), in: context, today: today)
         let all = try entries()
         #expect(all.map(\.dueDate) == [day(2026, 10, 22), day(2026, 11, 22), day(2026, 12, 22)])
         #expect(all.allSatisfy { $0.date == nil })
@@ -87,9 +92,7 @@ struct SchedulerTests {
     @Test func savingForFutureChangesOnlyWhatHasNotHappened() throws {
         monthlyRent(from: day(2026, 9, 1))
         let november = try occurrence(on: day(2026, 11, 1))
-        var draft = EntryDraft(entry: november, today: today, calendar: calendar)
-        draft.amountText = "1600"
-        Scheduler.updateThisAndFuture(november, with: draft, in: context, today: today, calendar: calendar)
+        saveForFuture(november) { $0.amountText = "1600" }
 
         let all = try entries()
         #expect(all.count == 14)
@@ -100,9 +103,7 @@ struct SchedulerTests {
     @Test func savingFutureFromAPaidOccurrenceKeepsLaterPaidOnes() throws {
         monthlyRent(from: day(2026, 9, 1))
         let september = try occurrence(on: day(2026, 9, 1))
-        var draft = EntryDraft(entry: september, today: today, calendar: calendar)
-        draft.amountText = "1700"
-        Scheduler.updateThisAndFuture(september, with: draft, in: context, today: today, calendar: calendar)
+        saveForFuture(september) { $0.amountText = "1700" }
 
         let all = try entries()
         #expect(all.count == 14)
@@ -114,9 +115,7 @@ struct SchedulerTests {
     @Test func movingTheDayMovesLaterOccurrences() throws {
         monthlyRent(from: day(2026, 9, 1))
         let november = try occurrence(on: day(2026, 11, 1))
-        var draft = EntryDraft(entry: november, today: today, calendar: calendar)
-        draft.date = day(2026, 11, 5)
-        Scheduler.updateThisAndFuture(november, with: draft, in: context, today: today, calendar: calendar)
+        saveForFuture(november) { $0.date = day(2026, 11, 5) }
 
         let dates = try entries().compactMap(\.date)
         #expect(dates.count == 14)
@@ -128,9 +127,7 @@ struct SchedulerTests {
     @Test func changingTheFrequencyRebuildsTheFuture() throws {
         monthlyRent(from: day(2026, 9, 1))
         let november = try occurrence(on: day(2026, 11, 1))
-        var draft = EntryDraft(entry: november, today: today, calendar: calendar)
-        draft.frequency = .quarterly
-        Scheduler.updateThisAndFuture(november, with: draft, in: context, today: today, calendar: calendar)
+        saveForFuture(november) { $0.frequency = .quarterly }
 
         #expect(try entries().compactMap(\.date) == [
             day(2026, 9, 1), day(2026, 10, 1), day(2026, 11, 1),
@@ -141,9 +138,7 @@ struct SchedulerTests {
     @Test func turningRepeatOffEndsTheSeries() throws {
         monthlyRent(from: day(2026, 9, 1))
         let november = try occurrence(on: day(2026, 11, 1))
-        var draft = EntryDraft(entry: november, today: today, calendar: calendar)
-        draft.frequency = nil
-        Scheduler.updateThisAndFuture(november, with: draft, in: context, today: today, calendar: calendar)
+        saveForFuture(november) { $0.frequency = nil }
 
         #expect(try entries().compactMap(\.date) == [day(2026, 9, 1), day(2026, 10, 1), day(2026, 11, 1)])
         #expect(november.series == nil)
@@ -153,7 +148,7 @@ struct SchedulerTests {
 
     @Test func deletingThisAndFutureKeepsHistory() throws {
         monthlyRent(from: day(2026, 9, 1))
-        Scheduler.deleteThisAndFuture(try occurrence(on: day(2026, 11, 1)), in: context, today: today, calendar: calendar)
+        Scheduler.deleteThisAndFuture(try occurrence(on: day(2026, 11, 1)), in: context, today: today)
 
         #expect(try entries().compactMap(\.date) == [day(2026, 9, 1), day(2026, 10, 1)])
         Scheduler.extendAll(in: context, today: day(2027, 6, 1))
@@ -163,28 +158,18 @@ struct SchedulerTests {
 
     @Test func deletingEveryOccurrenceRemovesTheSeries() throws {
         let rent = monthlyRent(from: day(2026, 11, 1))
-        Scheduler.deleteThisAndFuture(rent, in: context, today: today, calendar: calendar)
+        Scheduler.deleteThisAndFuture(rent, in: context, today: today)
         #expect(try entries().isEmpty)
         #expect(try seriesCount() == 0)
     }
 
     // MARK: Editing from the past
 
-    private func paidOrScheduledDates() throws -> [Date] {
-        try entries().compactMap(\.date)
-    }
-
-    private func saveForFuture(_ entry: Entry, _ change: (inout EntryDraft) -> Void) {
-        var draft = EntryDraft(entry: entry, today: today, calendar: calendar)
-        change(&draft)
-        Scheduler.updateThisAndFuture(entry, with: draft, in: context, today: today, calendar: calendar)
-    }
-
     @Test func movingAPastOccurrenceDoesNotCreatePaidCopies() throws {
         monthlyRent(from: day(2026, 9, 1))
         saveForFuture(try occurrence(on: day(2026, 9, 1))) { $0.date = day(2026, 9, 3) }
 
-        let dates = try paidOrScheduledDates()
+        let dates = try entries().compactMap(\.date)
         #expect(dates.count == 14)
         #expect(dates.filter { $0 <= today } == [day(2026, 9, 3), day(2026, 10, 1)])
         #expect(dates.contains(day(2026, 11, 3)))
@@ -195,7 +180,7 @@ struct SchedulerTests {
         monthlyRent(from: day(2026, 9, 1))
         saveForFuture(try occurrence(on: day(2026, 9, 1))) { $0.frequency = .biweekly }
 
-        let dates = try paidOrScheduledDates()
+        let dates = try entries().compactMap(\.date)
         #expect(dates.filter { $0 <= today } == [day(2026, 9, 1), day(2026, 10, 1)])
         #expect(dates.filter { $0 > today }.prefix(2) == [day(2026, 10, 27), day(2026, 11, 10)])
     }
@@ -205,7 +190,7 @@ struct SchedulerTests {
         try occurrence(on: day(2026, 12, 1)).date = today
         saveForFuture(try occurrence(on: day(2026, 11, 1))) { $0.amountText = "1600" }
 
-        let dates = try paidOrScheduledDates()
+        let dates = try entries().compactMap(\.date)
         #expect(dates.count == 14)
         #expect(!dates.contains(day(2026, 12, 1)))
         #expect(try occurrence(on: day(2027, 1, 1)).amountCents == 1_600_00)
@@ -225,10 +210,10 @@ struct SchedulerTests {
     @Test func changingOnlyTheAmountKeepsTheEndOfTheMonth() throws {
         let rent = Entry(kind: .spend, title: "Rent", amountCents: 1_500_00, date: day(2026, 1, 31))
         context.insert(rent)
-        Scheduler.startSeries(with: rent, frequency: .monthly, endDate: nil, in: context, today: today, calendar: calendar)
+        Scheduler.startSeries(with: rent, frequency: .monthly, endDate: nil, in: context, today: today)
         saveForFuture(try occurrence(on: day(2026, 2, 28))) { $0.amountText = "1600" }
 
-        let dates = try paidOrScheduledDates()
+        let dates = try entries().compactMap(\.date)
         #expect(dates.contains(day(2026, 10, 31)))
         #expect(dates.contains(day(2026, 11, 30)))
         #expect(!dates.contains(day(2026, 10, 28)))

@@ -53,9 +53,6 @@ final class Entry {
     }
 
     var isRepeating: Bool { series != nil }
-
-    /// Sort key by when it happens; entries with no date sort last.
-    var sortDate: Date { date ?? dueDate ?? .distantFuture }
 }
 
 extension Entry: LedgerItem {}

@@ -16,7 +16,7 @@ enum Money {
     /// The largest allowed amount: a trillion dollars, far below where sums could overflow.
     static let maximumCents = 100_000_000_000_000
 
-    static func decimal(fromCents cents: Int) -> Decimal {
+    private static func decimal(fromCents cents: Int) -> Decimal {
         Decimal(cents) / 100
     }
 

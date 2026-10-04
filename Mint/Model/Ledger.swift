@@ -7,7 +7,8 @@
 
 import Foundation
 
-/// The fields the ledger math needs. `Entry` conforms; tests use a lightweight struct.
+/// The fields the ledger math needs. `LedgerEntry` (the plain copy the views use), `Entry` and
+/// the tests' `TestItem` conform.
 protocol LedgerItem {
     var kind: EntryKind { get }
     var amountCents: Int { get }
@@ -19,6 +20,9 @@ protocol LedgerItem {
 extension LedgerItem {
     /// Positive when money comes in, negative when it goes out.
     var signedCents: Int { kind.sign * amountCents }
+
+    /// Sort key by when it happens; entries with no date sort last.
+    var sortDate: Date { date ?? dueDate ?? .distantFuture }
 }
 
 /// Where an entry stands, worked out from its date alone.
@@ -305,12 +309,6 @@ struct Ledger: Equatable {
         return points
     }
 
-    /// The lowest projected end-of-day balance from today through `date`, and the first day it happens.
-    func lowestBalance<Item: LedgerItem>(through date: Date, _ items: [Item]) -> BalancePoint {
-        lowestBalance(in: dailyBalances(items, from: today, through: date))
-            ?? BalancePoint(day: today, cents: currentBalance(items), isProjected: false)
-    }
-
     /// The lowest projected balance among `points`, from today on, and the first day it happens.
     func lowestBalance(in points: [BalancePoint]) -> BalancePoint? {
         points.filter { $0.isProjected && $0.day >= today }.min { $0.cents < $1.cents }
@@ -406,7 +404,7 @@ enum StatsPeriod: String, CaseIterable, Identifiable {
     }
 
     /// First day through last day of the month or year containing `date`.
-    static func dayRange(of component: Calendar.Component, containing date: Date, calendar: Calendar) -> ClosedRange<Date>? {
+    private static func dayRange(of component: Calendar.Component, containing date: Date, calendar: Calendar) -> ClosedRange<Date>? {
         guard let interval = calendar.dateInterval(of: component, for: date),
               let lastDay = calendar.date(byAdding: .day, value: -1, to: interval.end)
         else { return nil }

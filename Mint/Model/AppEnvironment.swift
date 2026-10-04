@@ -6,11 +6,15 @@
 //
 
 import Foundation
+import SwiftData
 
 /// Decides where this launch keeps its data.
 enum AppEnvironment {
+    /// Every SwiftData model Mint stores.
+    static let models: [any PersistentModel.Type] = [Entry.self, RecurringSeries.self, BalanceAdjustment.self]
+
     /// True while the unit tests run inside the app.
-    static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    private static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     /// Launch with `-demo YES` to try the app with sample data. Nothing is saved.
     static let isDemo = UserDefaults.standard.bool(forKey: "demo")

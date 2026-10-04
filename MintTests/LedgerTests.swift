@@ -97,8 +97,8 @@ struct LedgerTests {
         #expect(projected.last?.cents == 2_950_00)
     }
 
-    @Test func lowestBalanceFindsTheDip() {
-        let lowest = ledger.lowestBalance(through: day(2026, 11, 30), all)
+    @Test func lowestBalanceFindsTheDip() throws {
+        let lowest = try #require(ledger.lowestBalance(in: ledger.dailyBalances(all, from: ledger.today, through: day(2026, 11, 30))))
         #expect(lowest.cents == 1_150_00)
         #expect(lowest.day == day(2026, 11, 1))
 

@@ -14,14 +14,6 @@ import Testing
 struct ReminderTests {
     let today = day(2026, 10, 2)
 
-    /// Saves the entries so each gets its permanent ID.
-    private func saved(_ entries: [Entry]) throws -> [Entry] {
-        let context = try makeContext()
-        entries.forEach(context.insert)
-        try context.save()
-        return entries
-    }
-
     private func plan(_ entries: [Entry], balance: Int = 1_000_00, settings: ReminderSettings? = nil) -> [Reminder] {
         let ledger = Ledger(startingBalanceCents: balance, startDate: today, today: today)
         return ReminderPlanner.plan(entries: entries.map { LedgerEntry($0) }, ledger: ledger, settings: settings ?? .standard)

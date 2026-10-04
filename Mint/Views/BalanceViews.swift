@@ -35,7 +35,7 @@ struct WelcomeView: View {
     @State private var asOf = Date.now
     @FocusState private var isAmountFocused: Bool
 
-    private var parsedCents: Int? {
+    private var amountCents: Int? {
         Money.parseSignedCents(amountText)
     }
 
@@ -64,7 +64,7 @@ struct WelcomeView: View {
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
                 .controlSize(.large)
-                .disabled(parsedCents == nil)
+                .disabled(amountCents == nil)
         }
         .padding(32)
         .frame(width: 440)
@@ -72,7 +72,7 @@ struct WelcomeView: View {
     }
 
     private func finish() {
-        guard let cents = parsedCents else { return }
+        guard let cents = amountCents else { return }
         BalanceAdjustment.setStartingBalance(cents, on: asOf, in: context)
     }
 }
@@ -253,7 +253,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) { pendingDeletion = nil }
         } message: {
-            Text(pendingTitle == "starting balance"
+            Text(pendingDeletion?.modelContext != nil && pendingDeletion?.isStartingBalance == true
                 ? "The next balance becomes your starting balance."
                 : "Your balance will count from the one before it.")
         }

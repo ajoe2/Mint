@@ -36,7 +36,4 @@ struct LedgerEntry: LedgerItem, Equatable {
     }
 
     var id: PersistentIdentifier { entry.persistentModelID }
-
-    /// Sort key by when it happens; entries with no date sort last.
-    var sortDate: Date { date ?? dueDate ?? .distantFuture }
 }

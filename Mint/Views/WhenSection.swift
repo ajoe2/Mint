@@ -81,7 +81,7 @@ struct WhenSection: View {
     }
 
     /// Adds or removes the due date.
-    static let dueDateShortcut = KeyboardShortcut("d", modifiers: [.command, .shift])
+    private static let dueDateShortcut = KeyboardShortcut("d", modifiers: [.command, .shift])
 
     /// A sentence on how the status affects the balance.
     private var statusMessage: String {

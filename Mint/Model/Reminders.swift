@@ -64,7 +64,7 @@ struct Reminder: Equatable {
 /// Works out every reminder the entries call for. `ReminderCenter` delivers them.
 enum ReminderPlanner {
     /// How far ahead to look for a low balance; matches the Overview's chart.
-    static let lookAheadDays = 90
+    private static let lookAheadDays = 90
 
     /// Every reminder, soonest first, including past ones. Those aren't sent, but they tell which
     /// delivered notifications still apply.

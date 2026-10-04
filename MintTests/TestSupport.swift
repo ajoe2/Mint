@@ -27,10 +27,19 @@ func day(_ year: Int, _ month: Int, _ day: Int) -> Date {
 @MainActor
 func makeContext() throws -> ModelContext {
     let container = try ModelContainer(
-        for: Entry.self, RecurringSeries.self, BalanceAdjustment.self,
+        for: Schema(AppEnvironment.models),
         configurations: ModelConfiguration(UUID().uuidString, isStoredInMemoryOnly: true)
     )
     return ModelContext(container)
+}
+
+/// Saves the entries in a fresh store so each gets its permanent ID.
+@MainActor
+func saved(_ entries: [Entry]) throws -> [Entry] {
+    let context = try makeContext()
+    entries.forEach(context.insert)
+    try context.save()
+    return entries
 }
 
 /// An empty settings suite for one test. Each test passes its own name, and the name stays the
@@ -44,7 +53,7 @@ func testDefaults(_ name: String) -> UserDefaults {
 
 extension Ledger {
     /// A ledger with just a starting balance.
-    init(startingBalanceCents: Int, startDate: Date, today: Date, calendar: Calendar = .current) {
-        self.init(checkpoints: [BalanceCheckpoint(day: startDate, baseCents: startingBalanceCents)], today: today, calendar: calendar)
+    init(startingBalanceCents: Int, startDate: Date, today: Date) {
+        self.init(checkpoints: [BalanceCheckpoint(day: startDate, baseCents: startingBalanceCents)], today: today)
     }
 }

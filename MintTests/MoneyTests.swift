@@ -16,6 +16,7 @@ struct MoneyTests {
     @Test(arguments: [
         ("12.50", 1250), ("12.5", 1250), ("$1,234.56", 123456), ("1234", 123400),
         (".5", 50), (" 7 ", 700), ("0", 0), ("12.345", 1235), ("12.344", 1234),
+        ("1,234", 123400), ("12,345.67", 1234567), ("$1,000,000", 100000000),
     ])
     func parsesAmounts(text: String, cents: Int) {
         #expect(Money.parseCents(text, locale: us) == cents)
@@ -30,11 +31,6 @@ struct MoneyTests {
     ])
     func rejectsInvalidAmounts(text: String) {
         #expect(Money.parseCents(text, locale: us) == nil)
-    }
-
-    @Test(arguments: [("1,234", 123400), ("12,345.67", 1234567), ("$1,000,000", 100000000)])
-    func acceptsThousandsSeparators(text: String, cents: Int) {
-        #expect(Money.parseCents(text, locale: us) == cents)
     }
 
     @Test func followsOtherLocales() {

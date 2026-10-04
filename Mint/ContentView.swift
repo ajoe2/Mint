@@ -56,10 +56,7 @@ struct ContentView: View {
             // Undo can delete the entry an open editor is showing.
             if app.editor?.isAvailable == false { app.editor = nil }
         }
-        .onAppear {
-            modelContext.undoManager = undoManager
-        }
-        .onChange(of: undoManager) {
+        .onChange(of: undoManager, initial: true) {
             modelContext.undoManager = undoManager
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in
@@ -214,7 +211,7 @@ private struct TabShortcuts: NSViewRepresentable {
             let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
             switch (event.keyCode, modifiers) {
             case (124, [.command, .option]), (48, [.control]): return 1  // → or Tab
-            case (123, [.command, .option]), (48, [.control, .shift]): return -1  // ← or Tab
+            case (123, [.command, .option]), (48, [.control, .shift]): return -1  // ← or ⇧Tab
             default: return nil
             }
         }
@@ -224,5 +221,5 @@ private struct TabShortcuts: NSViewRepresentable {
 #Preview {
     ContentView()
         .environment(AppModel())
-        .modelContainer(for: [Entry.self, RecurringSeries.self, BalanceAdjustment.self], inMemory: true)
+        .modelContainer(for: AppEnvironment.models, inMemory: true)
 }

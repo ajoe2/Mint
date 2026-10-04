@@ -14,11 +14,7 @@ import Testing
 @MainActor
 struct KeyboardTests {
     private func ids(_ count: Int) throws -> [PersistentIdentifier] {
-        let context = try makeContext()
-        let entries = (0..<count).map { Entry(kind: .spend, title: "\($0)", amountCents: 100, date: nil) }
-        entries.forEach(context.insert)
-        try context.save()
-        return entries.map(\.persistentModelID)
+        try saved((0..<count).map { Entry(kind: .spend, title: "\($0)", amountCents: 100, date: nil) }).map(\.persistentModelID)
     }
 
     @Test func arrowKeysMoveThroughTheRows() throws {

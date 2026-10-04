@@ -108,7 +108,7 @@ func drawIcon(in context: CGContext) {
     func sideLeaf(_ degrees: CGFloat) -> Leaf {
         let radians = degrees * .pi / 180
         let base = CGPoint(x: node.x + cos(radians) * 44, y: node.y + sin(radians) * 44)
-        return Leaf(base: base, degrees: degrees, length: 270, halfWidth: 0.33)
+        return Leaf(base: base, degrees: degrees, length: 270)
     }
     let leaves = [sideLeaf(157), sideLeaf(23), Leaf(base: tip, degrees: 90, length: 380)]
     context.saveGState()

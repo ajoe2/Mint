@@ -25,11 +25,7 @@ struct MintApp: App {
     }
 
     private static func makeModelContainer() -> ModelContainer {
-        let schema = Schema([
-            Entry.self,
-            RecurringSeries.self,
-            BalanceAdjustment.self,
-        ])
+        let schema = Schema(AppEnvironment.models)
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: AppEnvironment.usesTemporaryData)
 
         do {
