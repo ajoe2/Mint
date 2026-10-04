@@ -61,7 +61,7 @@ extension FocusedValues {
 
 extension View {
     /// Lets the keyboard move through `entries`, this page's rows in display order. The page is one
-    /// Tab stop: ↑ and ↓ move the selection, Home and End jump to the ends, Esc clears it, and
+    /// Tab stop: ↑ and ↓ move the selection, ⌘↑ and ⌘↓ (or Home and End) jump to the ends, Esc clears it, and
     /// Return, Space and Delete act on the selected entry like the Entry menu.
     /// `onSideways` handles ← (-1) and → (+1) on pages with a choice to flip through.
     func keyboardRows(_ entries: [Entry], selection: RowSelection, ledger: Ledger, onSideways: ((Int) -> Void)? = nil) -> some View {
@@ -90,7 +90,12 @@ private struct KeyboardRows: ViewModifier {
                 .focused($isFocused)
                 .focusEffectDisabled()
                 .onKeyPress(keys: [.upArrow, .downArrow, .home, .end]) { press in
-                    guard let target = RowSelection.target(of: press.key, from: selection.selected, in: ids) else { return .ignored }
+                    // ⌘↑ and ⌘↓ (or ⌥) jump to the first and last rows, as in Finder and Mail.
+                    var key = press.key
+                    if !press.modifiers.isDisjoint(with: [.command, .option]) {
+                        key = key == .upArrow ? .home : key == .downArrow ? .end : key
+                    }
+                    guard let target = RowSelection.target(of: key, from: selection.selected, in: ids) else { return .ignored }
                     select(target, proxy: proxy)
                     return .handled
                 }
@@ -170,13 +175,15 @@ struct EntryCommands: Commands {
     var body: some Commands {
         CommandMenu("Entry") {
             Group {
+                // Return and Space also work in the list. Menus use ⌘O (Open) and ⌘I (Get Info), as in Finder and Mail.
                 Button("Edit…") { selected?.edit() }
-                    .keyboardShortcut(.return, modifiers: [])
+                    .keyboardShortcut("o")
                 Button("Change Status…") { selected?.changeStatus() }
-                    .keyboardShortcut(.space, modifiers: [])
+                    .keyboardShortcut("i")
                 Divider()
+                // Like Mark as Completed in Reminders.
                 Button(toggleTitle) { selected?.togglePaid() }
-                    .keyboardShortcut("k")
+                    .keyboardShortcut("c", modifiers: [.command, .shift])
                 Button("Duplicate…") { selected?.duplicate() }
                     .keyboardShortcut("d")
                 Divider()
@@ -204,8 +211,9 @@ struct HelpCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .help) {
+            // ⌘?, the standard Help shortcut.
             Button("Keyboard Shortcuts") { openWindow(id: ShortcutsView.windowID) }
-                .keyboardShortcut("/")
+                .keyboardShortcut("?")
         }
     }
 }

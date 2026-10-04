@@ -46,6 +46,7 @@ struct KeyboardTests {
             for item in menu.items {
                 if !item.keyEquivalent.isEmpty {
                     shortcuts[item.title] = (item.keyEquivalentModifierMask.contains(.option) ? "⌥" : "")
+                        + (item.keyEquivalentModifierMask.contains(.shift) ? "⇧" : "")
                         + (item.keyEquivalentModifierMask.contains(.command) ? "⌘" : "")
                         + item.keyEquivalent
                 }
@@ -53,14 +54,14 @@ struct KeyboardTests {
             }
         }
         walk(try #require(NSApp.mainMenu))
-        #expect(shortcuts["Edit…"] == "\r")
-        #expect(shortcuts["Change Status…"] == " ")
-        #expect(shortcuts["Mark as Paid Today"] == "⌘k")
+        #expect(shortcuts["Edit…"] == "⌘o")
+        #expect(shortcuts["Change Status…"] == "⌘i")
+        #expect(shortcuts["Mark as Paid Today"] == "⇧⌘c")
         #expect(shortcuts["Duplicate…"] == "⌘d")
         #expect(shortcuts["Delete"] == "⌘\u{8}")
         #expect(shortcuts["Delete This and Future Repeats"] == "⌥⌘\u{8}")
         #expect(shortcuts["Find…"] == "⌘f")
-        #expect(shortcuts["Keyboard Shortcuts"] == "⌘/")
+        #expect(shortcuts["Keyboard Shortcuts"] == "⌘?")
     }
 
     /// A window showing the app with sample data, plus a function that presses keys in it.
@@ -119,6 +120,36 @@ struct KeyboardTests {
         press("\u{1B}", 53)
         press("\r", 36)
         #expect(app.editor == nil)
+    }
+
+    @Test func tabShortcutsSwitchScreens() throws {
+        let (app, _, window, _) = try appWindow(showing: .overview)
+        defer { window.close() }
+        func press(_ characters: String, _ keyCode: UInt16, _ modifiers: NSEvent.ModifierFlags) {
+            NSApp.sendEvent(NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: window.windowNumber, context: nil, characters: characters,
+                charactersIgnoringModifiers: characters, isARepeat: false, keyCode: keyCode
+            )!)
+            RunLoop.main.run(until: .now + 0.3)
+        }
+        let left = String(UnicodeScalar(NSLeftArrowFunctionKey)!)
+        // Shift-Tab types a back-tab character instead of a tab.
+        let backTab = String(UnicodeScalar(NSBackTabCharacter)!)
+
+        // Real arrow key presses also carry the function and keypad flags.
+        let arrow: NSEvent.ModifierFlags = [.command, .option, .function, .numericPad]
+        press(right, 124, arrow)
+        #expect(app.selection == .transactions)
+        press("\t", 48, .control)
+        #expect(app.selection == .statistics)
+        // Both wrap around, like tabs in Safari.
+        press("\t", 48, .control)
+        #expect(app.selection == .overview)
+        press(left, 123, arrow)
+        #expect(app.selection == .statistics)
+        press(backTab, 48, [.control, .shift])
+        #expect(app.selection == .transactions)
     }
 
     @Test func arrowsFlipThroughFiltersAndPeriods() throws {

@@ -125,6 +125,7 @@ struct ContentView: View {
                 app.listFocusRequest += 1
             }
             .onChange(of: app.searchFocusRequest) { isSearchFocused = true }
+            .background { TabShortcuts() }
         }
     }
 
@@ -147,6 +148,57 @@ struct ContentView: View {
             suggestions[kind] = used + kind.defaultCategories.filter { !used.contains($0) }
         }
         return suggestions
+    }
+}
+
+/// More ways to switch tabs besides ⇧⌘] and ⇧⌘[ in the View menu: ⌥⌘→ and ⌥⌘← as in Safari and
+/// Chrome, and ⌃⇥ and ⌃⇧⇥ as in most tabbed apps. A menu item can show only one shortcut, and
+/// SwiftUI shortcuts can't tell ⌃⇥ from ⌃⇧⇥, so this watches key presses in its window directly.
+private struct TabShortcuts: NSViewRepresentable {
+    @Environment(AppModel.self) private var app
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        context.coordinator.view = view
+        context.coordinator.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak coordinator = context.coordinator] event in
+            guard let coordinator, let offset = coordinator.offset(for: event) else { return event }
+            coordinator.app.selection = coordinator.app.selection.moved(by: offset)
+            return nil
+        }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        context.coordinator.app = app
+    }
+
+    static func dismantleNSView(_ view: NSView, coordinator: Coordinator) {
+        coordinator.monitor.map(NSEvent.removeMonitor)
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(app: app)
+    }
+
+    final class Coordinator {
+        var app: AppModel
+        weak var view: NSView?
+        var monitor: Any?
+
+        init(app: AppModel) {
+            self.app = app
+        }
+
+        /// +1 for the next tab, -1 for the previous one, or `nil` if `event` isn't a tab shortcut for this window.
+        func offset(for event: NSEvent) -> Int? {
+            guard app.isBrowsing, let window = view?.window, event.window === window else { return nil }
+            let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+            switch (event.keyCode, modifiers) {
+            case (124, [.command, .option]), (48, [.control]): return 1  // → or Tab
+            case (123, [.command, .option]), (48, [.control, .shift]): return -1  // ← or Tab
+            default: return nil
+            }
+        }
     }
 }
 

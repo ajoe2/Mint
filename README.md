@@ -44,10 +44,10 @@ Search (⌘F) finds entries by name, category or notes. Press Return to move int
 
 Click an entry to edit it, or right-click it for **Mark as Paid Today**, **Duplicate** and **Delete**.
 
-**Keyboard.** Everything works from the keyboard; **Help → Keyboard Shortcuts** (⌘/) lists every shortcut. The main ones:
+**Keyboard.** Everything works from the keyboard; **Help → Keyboard Shortcuts** (⌘?) lists every shortcut. The main ones:
 
-- ⌘N adds an entry, and ⌘1–⌘3 switch screens.
-- In Overview and Transactions, ↑ and ↓ move between entries. Return edits, Space changes the status, ⌘K marks paid and Delete deletes.
+- ⌘N adds an entry. ⌘1–⌘3 switch screens, and ⇧⌘] and ⇧⌘[ (or ⌥⌘→ and ⌥⌘←, or ⌃⇥ and ⌃⇧⇥) go to the next or previous one.
+- In Overview and Transactions, ↑ and ↓ move between entries and ⌘↑ and ⌘↓ jump to the first and last. Return (or ⌘O) edits, Space (or ⌘I) changes the status, ⇧⌘C marks paid, ⌘D duplicates and Delete deletes.
 - ← and → switch the Transactions filter and the Statistics period.
 - In the entry editor, ⌘1–⌘4 pick the kind and Return saves.
 

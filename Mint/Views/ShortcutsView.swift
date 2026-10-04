@@ -13,7 +13,7 @@ struct ShortcutsView: View {
 
     private struct ShortcutGroup: Identifiable {
         let title: String
-        /// Several keys are alternatives, listed in the order the action names them.
+        /// Several keys are either alternatives or, like "Next or previous", listed in the order the action names them.
         let shortcuts: [(action: String, keys: [String])]
         var id: String { title }
     }
@@ -23,19 +23,19 @@ struct ShortcutsView: View {
             ("New entry", ["⌘N"]),
             ("Adjust balance", ["⇧⌘B"]),
             ("Overview, Transactions, Statistics", ["⌘1", "⌘2", "⌘3"]),
-            ("Next or previous tab", ["⇧⌘]", "⇧⌘["]),
+            ("Next or previous tab", ["⇧⌘]", "⇧⌘[", "⌥⌘→", "⌥⌘←", "⌃⇥", "⌃⇧⇥"]),
             ("Search", ["⌘F"]),
             ("Go from search to the results", ["↩"]),
             ("Undo or redo", ["⌘Z", "⇧⌘Z"]),
             ("Settings", ["⌘,"]),
-            ("These shortcuts", ["⌘/"]),
+            ("These shortcuts", ["⌘?"]),
         ]),
         ShortcutGroup(title: "Overview and Transactions", shortcuts: [
             ("Next or previous entry", ["↓", "↑"]),
-            ("First or last entry", ["Home", "End"]),
-            ("Edit", ["↩"]),
-            ("Change status and dates", ["Space"]),
-            ("Mark as paid, or unpaid", ["⌘K"]),
+            ("First or last entry", ["⌘↑", "⌘↓"]),
+            ("Edit", ["↩", "⌘O"]),
+            ("Change status and dates", ["Space", "⌘I"]),
+            ("Mark as paid, or unpaid", ["⇧⌘C"]),
             ("Duplicate", ["⌘D"]),
             ("Delete", ["⌫"]),
             ("Delete this and future repeats", ["⌥⌘⌫"]),
