@@ -18,7 +18,7 @@ struct AppModelTests {
     }
 
     @Test func filtersListEveryKind() {
-        #expect(TransactionFilter.allCases.map(\.title) == ["All", "Spending", "Income", "Investments", "Subsidies", "Adjustments"])
+        #expect(TransactionFilter.allCases.map(\.title) == ["All", "Spending", "Income", "Investments", "Subsidies"])
     }
 
     @Test func newEntriesFollowTheTransactionsFilter() {

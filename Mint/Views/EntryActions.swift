@@ -24,26 +24,26 @@ struct EntryActions {
 
     /// Marks it paid (or received, or invested) as of today.
     func complete(_ entry: Entry) {
-        withAnimation { entry.date = ledger.today }
+        withAnimation(Motion.standard) { entry.date = ledger.today }
         context.undoManager?.setActionName(Self.completeTitle(for: entry.kind))
         context.saveNow()
     }
 
     /// Clears the date, making it unpaid again.
     func uncomplete(_ entry: Entry) {
-        withAnimation { entry.date = nil }
+        withAnimation(Motion.standard) { entry.date = nil }
         context.undoManager?.setActionName(Self.uncompleteTitle(for: entry.kind))
         context.saveNow()
     }
 
     func delete(_ entry: Entry) {
-        withAnimation { context.delete(entry) }
+        withAnimation(Motion.standard) { context.delete(entry) }
         context.undoManager?.setActionName("Delete Entry")
         context.saveNow()
     }
 
     func deleteThisAndFuture(_ entry: Entry) {
-        withAnimation { Scheduler.deleteThisAndFuture(entry, in: context, today: ledger.today, calendar: ledger.calendar) }
+        withAnimation(Motion.standard) { Scheduler.deleteThisAndFuture(entry, in: context, today: ledger.today, calendar: ledger.calendar) }
         context.undoManager?.setActionName("Delete Repeats")
         context.saveNow()
     }

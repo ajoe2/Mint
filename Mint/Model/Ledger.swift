@@ -98,7 +98,7 @@ struct BalanceCheckpoint: Equatable {
 ///
 /// The balance counts from the newest checkpoint. Paid entries dated before that day are history:
 /// they show up in statistics but are already part of the balance that was entered.
-struct Ledger {
+struct Ledger: Equatable {
     /// How many days ahead Coming up looks.
     static let comingUpDays = 28
     /// Unpaid entries due within this many days are due soon.
@@ -108,6 +108,10 @@ struct Ledger {
     let checkpoints: [BalanceCheckpoint]
     let today: Date
     let calendar: Calendar
+    /// The start of tomorrow, and of the day after the due-soon window. Comparing dates against
+    /// these is much cheaper than finding the start of each entry's day.
+    private let tomorrow: Date
+    private let dueSoonEnd: Date
 
     init(checkpoints: [BalanceCheckpoint], today: Date, calendar: Calendar = .current) {
         let today = calendar.startOfDay(for: today)
@@ -117,6 +121,9 @@ struct Ledger {
         self.checkpoints = sorted.isEmpty ? [BalanceCheckpoint(day: today, baseCents: 0)] : sorted
         self.today = today
         self.calendar = calendar
+        let nextDay = { (days: Int) in calendar.startOfDay(for: calendar.date(byAdding: .day, value: days, to: today) ?? today) }
+        self.tomorrow = nextDay(1)
+        self.dueSoonEnd = nextDay(Self.dueSoonDays + 1)
     }
 
     /// The checkpoint the current balance counts from.
@@ -143,20 +150,19 @@ struct Ledger {
 
     func status(of item: some LedgerItem) -> EntryStatus {
         guard let date = item.date else { return .unpaid }
-        return day(date) <= today ? .paid : .scheduled
+        return date < tomorrow ? .paid : .scheduled
     }
 
     /// Unpaid, and its due date has passed.
     func isOverdue(_ item: some LedgerItem) -> Bool {
         guard status(of: item) == .unpaid, let due = item.dueDate else { return false }
-        return day(due) < today
+        return due < today
     }
 
     /// Unpaid, and due between today and `dueSoonDays` from now.
     func isDueSoon(_ item: some LedgerItem) -> Bool {
         guard status(of: item) == .unpaid, let due = item.dueDate else { return false }
-        let dueDay = day(due)
-        return dueDay >= today && dueDay <= addingDays(Self.dueSoonDays, to: today)
+        return due >= today && due < dueSoonEnd
     }
 
     /// Scheduled for a day after it's due.
@@ -167,8 +173,8 @@ struct Ledger {
 
     /// Paid and dated on or after the day the balance counts from.
     func countsTowardBalance(_ item: some LedgerItem) -> Bool {
-        guard status(of: item) == .paid, let date = item.date else { return false }
-        return day(date) >= balanceStartDay
+        guard let date = item.date, date < tomorrow else { return false }
+        return date >= balanceStartDay
     }
 
     /// When a pending entry should move money: its scheduled date, else its due date (or today if
@@ -208,30 +214,22 @@ struct Ledger {
         return amountCents - paidThatDay
     }
 
-    /// The balance at the end of `date`, assuming everything pending happens when expected.
-    func projectedBalance<Item: LedgerItem>(on date: Date, _ items: [Item]) -> Int {
-        let target = day(date)
-        return items.reduce(currentBalance(items)) { total, item in
-            guard let expected = expectedDay(of: item), expected <= target else { return total }
-            return total + item.signedCents
-        }
-    }
-
     /// Pending entries in the order they're expected, each with the balance right after it.
     /// Entries with no dates are left out, since there's no telling when they'll happen.
     func forecast<Item: LedgerItem>(_ items: [Item]) -> [ForecastStep<Item>] {
+        // Each entry's fields are read once, not on every comparison.
         let pending = items.compactMap { item in
-            expectedDay(of: item).map { (item: item, day: $0) }
+            expectedDay(of: item).map { (item: item, day: $0, isInflow: item.kind.isInflow, cents: item.amountCents, signed: item.signedCents) }
         }
         let ordered = pending.sorted { a, b in
             if a.day != b.day { return a.day < b.day }
             // Same day: money in first, then larger amounts first.
-            if a.item.kind.isInflow != b.item.kind.isInflow { return a.item.kind.isInflow }
-            return a.item.amountCents > b.item.amountCents
+            if a.isInflow != b.isInflow { return a.isInflow }
+            return a.cents > b.cents
         }
         var balance = currentBalance(items)
         return ordered.map { step in
-            balance += step.item.signedCents
+            balance += step.signed
             return ForecastStep(item: step.item, day: step.day, balanceAfter: balance)
         }
     }
@@ -246,10 +244,13 @@ struct Ledger {
         let last = day(end)
         guard first <= last else { return [] }
 
+        // Paid entries before both the range and the first checkpoint never change a shown day.
+        let oldestNeeded = min(first, origin)
         var paid: [Date: Int] = [:]
         var pending: [Date: Int] = [:]
         for item in items {
             if status(of: item) == .paid, let date = item.date {
+                guard date >= oldestNeeded else { continue }
                 paid[day(date), default: 0] += item.signedCents
             } else if let expected = expectedDay(of: item) {
                 pending[expected, default: 0] += item.signedCents
@@ -319,10 +320,11 @@ struct Ledger {
 
     /// Totals of paid entries, optionally limited to a range of days.
     func totals<Item: LedgerItem>(_ items: [Item], in range: ClosedRange<Date>? = nil) -> Totals {
+        let span = range.map(span(of:))
         var totals = Totals()
         for item in items where status(of: item) == .paid {
             guard let date = item.date else { continue }
-            if let range, !range.contains(day(date)) { continue }
+            if let span, !span.contains(date) { continue }
             totals[item.kind] += item.amountCents
         }
         return totals
@@ -342,10 +344,11 @@ struct Ledger {
     /// Paid spending by category, largest first. Categories differing only in capitalization are
     /// merged under the first spelling seen; blank ones go under "Uncategorized".
     func spendingByCategory<Item: LedgerItem>(_ items: [Item], in range: ClosedRange<Date>? = nil) -> [CategoryTotal] {
+        let span = range.map(span(of:))
         var totals: [String: CategoryTotal] = [:]
         for item in items where item.kind == .spend && status(of: item) == .paid {
             guard let date = item.date else { continue }
-            if let range, !range.contains(day(date)) { continue }
+            if let span, !span.contains(date) { continue }
             let trimmed = item.category.trimmingCharacters(in: .whitespaces)
             let name = trimmed.isEmpty ? "Uncategorized" : trimmed
             totals[name.lowercased(), default: CategoryTotal(name: name, cents: 0)].cents += item.amountCents
@@ -358,14 +361,22 @@ struct Ledger {
         guard let thisMonth = calendar.dateInterval(of: .month, for: today)?.start else { return [] }
         let months = (0..<max(count, 0)).reversed().compactMap { calendar.date(byAdding: .month, value: -$0, to: thisMonth) }
         guard let first = months.first else { return [] }
-        var byMonth: [Date: Totals] = [:]
+        var byMonth = Array(repeating: Totals(), count: months.count)
         for item in items where status(of: item) == .paid {
-            guard let date = item.date, day(date) >= first,
-                  let month = calendar.dateInterval(of: .month, for: date)?.start
+            // Months are oldest first, so the entry's month is the last one starting on or before it.
+            guard let date = item.date, date >= first,
+                  let index = months.lastIndex(where: { $0 <= date })
             else { continue }
-            byMonth[month, default: Totals()][item.kind] += item.amountCents
+            byMonth[index][item.kind] += item.amountCents
         }
-        return months.map { MonthTotals(month: $0, totals: byMonth[$0] ?? Totals()) }
+        return zip(months, byMonth).map { MonthTotals(month: $0, totals: $1) }
+    }
+
+    /// The instants a range of days covers, from the start of its first day to the start of the
+    /// day after its last.
+    private func span(of range: ClosedRange<Date>) -> Range<Date> {
+        let start = day(range.lowerBound)
+        return start..<max(addingDays(1, to: range.upperBound), start)
     }
 }
 

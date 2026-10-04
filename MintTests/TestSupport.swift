@@ -33,6 +33,15 @@ func makeContext() throws -> ModelContext {
     return ModelContext(container)
 }
 
+/// An empty settings suite for one test. Each test passes its own name, and the name stays the
+/// same between runs, so they reuse one file instead of leaving a new one behind every time.
+func testDefaults(_ name: String) -> UserDefaults {
+    let suite = "com.ajoe.Mint.tests.\(name)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defaults.removePersistentDomain(forName: suite)
+    return defaults
+}
+
 extension Ledger {
     /// A ledger with just a starting balance.
     init(startingBalanceCents: Int, startDate: Date, today: Date, calendar: Calendar = .current) {

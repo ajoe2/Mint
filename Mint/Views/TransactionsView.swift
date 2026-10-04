@@ -41,7 +41,7 @@ enum HistoryItem: Identifiable {
 
 /// Every transaction in one list: overdue, coming up, no date, then what already happened.
 struct TransactionsView: View {
-    let entries: [Entry]
+    let entries: [LedgerEntry]
     let adjustments: [BalanceAdjustment]
     let ledger: Ledger
 
@@ -70,8 +70,8 @@ struct TransactionsView: View {
         let months = historyByMonth()
         let isEmpty = overdue.isEmpty && upcoming.isEmpty && undated.isEmpty && months.isEmpty
         // Entry rows in display order, for keyboard navigation.
-        let rows = overdue + comingUp.map(\.item) + (showsLater ? later.map(\.item) : [])
-            + undated + months.flatMap { $0.items.compactMap(\.entry) }
+        let rows = (overdue + comingUp.map(\.item) + (showsLater ? later.map(\.item) : []) + undated).map(\.entry)
+            + months.flatMap { $0.items.compactMap(\.entry) }
 
         Page {
             LazyVStack(alignment: .leading, spacing: 26) {
@@ -81,7 +81,7 @@ struct TransactionsView: View {
                     selection: $app.transactionFilter
                 )
 
-                if entries.isEmpty && query.isEmpty && app.transactionFilter != .adjustments {
+                if entries.isEmpty && query.isEmpty {
                     ContentUnavailableView {
                         Label("No Transactions", systemImage: "tray")
                     } description: {
@@ -101,7 +101,7 @@ struct TransactionsView: View {
                 }
 
                 if !overdue.isEmpty {
-                    OverdueSection(entries: overdue, ledger: ledger)
+                    OverdueSection(entries: overdue.map(\.entry), ledger: ledger)
                 }
 
                 if !upcoming.isEmpty {
@@ -114,8 +114,8 @@ struct TransactionsView: View {
                             upcomingRows(comingUp, showsBalance: showsBalance)
                         }
                         if !later.isEmpty && !showsLater {
-                            Button("Show \(later.count) later") { showsLater = true }
-                                .buttonStyle(.link)
+                            Button("Show \(later.count) later") { withAnimation(Motion.standard) { showsLater = true } }
+                                .buttonStyle(.accentLink)
                         }
                     }
                 }
@@ -134,8 +134,8 @@ struct TransactionsView: View {
 
                 if !undated.isEmpty {
                     TitledSection("No date") {
-                        RowCard(items: undated, id: \.persistentModelID) { entry in
-                            EntryRowView(entry: entry, ledger: ledger)
+                        RowCard(items: undated, id: \.id) { item in
+                            EntryRowView(entry: item.entry, ledger: ledger)
                         }
                     }
                 }
@@ -169,24 +169,20 @@ struct TransactionsView: View {
         .keyboardRows(rows, selection: selection, ledger: ledger) { step in
             let filters = TransactionFilter.allCases
             let index = filters.firstIndex(of: app.transactionFilter) ?? 0
-            withAnimation(.snappy(duration: 0.25)) {
+            withAnimation(Motion.quick) {
                 app.transactionFilter = filters[min(max(index + step, 0), filters.count - 1)]
             }
         }
     }
 
-    private func upcomingRows(_ steps: [ForecastStep<Entry>], showsBalance: Bool) -> some View {
-        RowCard(items: steps, id: \.item.persistentModelID) { step in
-            EntryRowView(entry: step.item, ledger: ledger, balanceAfter: showsBalance ? step.balanceAfter : nil)
+    private func upcomingRows(_ steps: [ForecastStep<LedgerEntry>], showsBalance: Bool) -> some View {
+        RowCard(items: steps, id: \.item.id) { step in
+            EntryRowView(entry: step.item.entry, ledger: ledger, balanceAfter: showsBalance ? step.balanceAfter : nil)
         }
     }
 
-    private func matches(_ entry: Entry) -> Bool {
-        switch app.transactionFilter {
-        case .adjustments: return false
-        case .kind(let kind) where entry.kind != kind: return false
-        default: break
-        }
+    private func matches(_ entry: LedgerEntry) -> Bool {
+        if case .kind(let kind) = app.transactionFilter, entry.kind != kind { return false }
         return query.isEmpty
             || entry.title.localizedStandardContains(query)
             || entry.category.localizedStandardContains(query)
@@ -194,7 +190,7 @@ struct TransactionsView: View {
     }
 
     private func matches(_ adjustment: BalanceAdjustment) -> Bool {
-        guard app.transactionFilter == .all || app.transactionFilter == .adjustments else { return false }
+        guard app.transactionFilter == .all else { return false }
         return query.isEmpty || adjustment.title.localizedStandardContains(query)
     }
 
@@ -205,8 +201,8 @@ struct TransactionsView: View {
     }
 
     /// Groups upcoming items past the next four weeks by month. Expects them in date order.
-    private func laterByMonth(_ steps: [ForecastStep<Entry>]) -> [(month: Date, steps: [ForecastStep<Entry>])] {
-        var groups: [(month: Date, steps: [ForecastStep<Entry>])] = []
+    private func laterByMonth(_ steps: [ForecastStep<LedgerEntry>]) -> [(month: Date, steps: [ForecastStep<LedgerEntry>])] {
+        var groups: [(month: Date, steps: [ForecastStep<LedgerEntry>])] = []
         for step in steps {
             if let last = groups.last, ledger.calendar.isDate(step.day, equalTo: last.month, toGranularity: .month) {
                 groups[groups.count - 1].steps.append(step)
@@ -219,11 +215,22 @@ struct TransactionsView: View {
 
     /// Paid entries and adjustments, newest first, grouped by month.
     private func historyByMonth() -> [(month: Date, items: [HistoryItem])] {
-        let items = entries.filter { ledger.status(of: $0) == .paid && matches($0) }.map(HistoryItem.entry)
-            + adjustments.filter(matches).map(HistoryItem.adjustment)
-        // Compute each day once, not in every comparison.
-        let sorted = items
-            .map { (item: $0, day: ledger.day($0.day), createdAt: $0.createdAt) }
+        // Each day is worked out once, not in every comparison, and remembered, since many
+        // entries share a date.
+        var days: [Date: Date] = [:]
+        func day(_ date: Date) -> Date {
+            if let day = days[date] { return day }
+            let day = ledger.day(date)
+            days[date] = day
+            return day
+        }
+        let paid = entries
+            .filter { ledger.status(of: $0) == .paid && matches($0) }
+            .map { (item: HistoryItem.entry($0.entry), day: day($0.sortDate), createdAt: $0.createdAt) }
+        let adjusted = adjustments
+            .filter(matches)
+            .map { (item: HistoryItem.adjustment($0), day: ledger.day($0.day), createdAt: $0.createdAt) }
+        let sorted = (paid + adjusted)
             .sorted { $0.day != $1.day ? $0.day > $1.day : $0.createdAt > $1.createdAt }
         var groups: [(month: Date, items: [HistoryItem])] = []
         for (item, day, _) in sorted {

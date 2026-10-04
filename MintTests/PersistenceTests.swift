@@ -12,15 +12,25 @@ import Testing
 
 /// Changes must reach disk right away, not on autosave. Each test makes a change, then
 /// reopens the store the way a relaunch would.
+///
+/// A class, so `deinit` can delete each test's store when it finishes.
 @MainActor
-struct PersistenceTests {
+final class PersistenceTests {
     let schema = Schema([Entry.self, RecurringSeries.self, BalanceAdjustment.self])
-    let url = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).store")
+    /// Holds the store and the files SQLite keeps beside it.
+    let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let container: ModelContainer
     let ledger = Ledger(startingBalanceCents: 0, startDate: day(2026, 10, 1), today: day(2026, 10, 15))
 
+    var url: URL { folder.appending(path: "Mint.store") }
+
     init() throws {
-        container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, url: url))
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, url: folder.appending(path: "Mint.store")))
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: folder)
     }
 
     private var actions: EntryActions {

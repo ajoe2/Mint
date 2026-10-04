@@ -96,7 +96,7 @@ struct ChoiceBar<Value: Hashable>: View {
     }
 
     private func select(_ value: Value) {
-        withAnimation(.snappy(duration: 0.25)) { selection = value }
+        withAnimation(Motion.quick) { selection = value }
     }
 
     private func step(by offset: Int) {

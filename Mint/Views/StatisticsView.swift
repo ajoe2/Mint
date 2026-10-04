@@ -10,7 +10,7 @@ import SwiftUI
 
 /// Totals by kind, where the spending went, and money in and out by month.
 struct StatisticsView: View {
-    let entries: [Entry]
+    let entries: [LedgerEntry]
     let adjustments: [BalanceAdjustment]
     let ledger: Ledger
 
@@ -30,7 +30,6 @@ struct StatisticsView: View {
             }
             MoneyText(cents: cents, size: 24)
                 .fixedSize()
-                .contentTransition(.numericText())
         }
         .card(padding: 16)
         .accessibilityElement(children: .combine)
@@ -62,7 +61,6 @@ struct StatisticsView: View {
                                 .foregroundStyle(.secondary)
                             MoneyText(cents: totals.net, size: 26, showPlus: true)
                                 .foregroundStyle(Theme.signed(totals.net))
-                                .contentTransition(.numericText())
                         }
                         .accessibilityElement(children: .combine)
                     }
@@ -120,7 +118,7 @@ struct StatisticsView: View {
                     .padding(.top, 40)
                 }
             }
-            .animation(.default, value: period)
+            .animation(Motion.standard, value: period)
         }
         // ← and → change the period without tabbing to it first.
         .focusable(interactions: .edit)
@@ -129,7 +127,7 @@ struct StatisticsView: View {
         .onKeyPress(keys: [.leftArrow, .rightArrow]) { press in
             let periods = StatsPeriod.allCases
             let index = periods.firstIndex(of: period) ?? 0
-            withAnimation(.snappy(duration: 0.25)) {
+            withAnimation(Motion.quick) {
                 period = periods[min(max(index + (press.key == .leftArrow ? -1 : 1), 0), periods.count - 1)]
             }
             return .handled

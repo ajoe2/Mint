@@ -68,7 +68,7 @@ enum ReminderPlanner {
 
     /// Every reminder, soonest first, including past ones. Those aren't sent, but they tell which
     /// delivered notifications still apply.
-    static func plan(entries: [Entry], ledger: Ledger, settings: ReminderSettings) -> [Reminder] {
+    static func plan(entries: [LedgerEntry], ledger: Ledger, settings: ReminderSettings) -> [Reminder] {
         var reminders: [Reminder] = []
         if settings.dueDates {
             for entry in entries where ledger.status(of: entry) == .unpaid {
@@ -82,8 +82,8 @@ enum ReminderPlanner {
         return reminders.sorted { ($0.date, $0.id) < ($1.date, $1.id) }
     }
 
-    private static func dueReminders(for entry: Entry, due: Date, ledger: Ledger, settings: ReminderSettings) -> [Reminder] {
-        let key = Reminder.key(for: entry.persistentModelID)
+    private static func dueReminders(for entry: LedgerEntry, due: Date, ledger: Ledger, settings: ReminderSettings) -> [Reminder] {
+        let key = Reminder.key(for: entry.id)
         let amount = Money.format(entry.amountCents)
         let remindDay = ledger.addingDays(-settings.daysBefore, to: due)
         let stamp = stamp(due, calendar: ledger.calendar)
@@ -108,7 +108,7 @@ enum ReminderPlanner {
     }
 
     /// One for each time the projected balance crosses below the limit.
-    private static func lowBalanceReminders(_ entries: [Entry], ledger: Ledger, settings: ReminderSettings) -> [Reminder] {
+    private static func lowBalanceReminders(_ entries: [LedgerEntry], ledger: Ledger, settings: ReminderSettings) -> [Reminder] {
         let limit = settings.limitCents
         let points = ledger.dailyBalances(entries, from: ledger.today, through: ledger.addingDays(lookAheadDays, to: ledger.today))
         var previous = ledger.currentBalance(entries)

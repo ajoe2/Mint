@@ -5,7 +5,22 @@
 //  Created by Andy Joe on 10/2/26.
 //
 
+import AppKit
 import SwiftUI
+
+/// How things move. With Reduce Motion on in System Settings, changes happen at once instead.
+enum Motion {
+    static var isReduced: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+
+    /// For changes to the data: rows, amounts, bars and the chart.
+    static var standard: Animation? { isReduced ? nil : .snappy(duration: 0.35) }
+
+    /// For controls, like a selector's highlight sliding over.
+    static var quick: Animation? { isReduced ? nil : .snappy(duration: 0.25) }
+
+    /// For one screen giving way to another. A fade isn't motion, so it stays with Reduce Motion on.
+    static let fade = Animation.easeInOut(duration: 0.2)
+}
 
 /// The few colors and shapes every screen shares.
 enum Theme {
@@ -78,13 +93,21 @@ extension View {
 struct Page<Content: View>: View {
     @ViewBuilder var content: Content
 
+    static var maxWidth: CGFloat { 1080 }
+    static var padding: CGFloat { 24 }
+
+    /// How wide the content column is in a page `pageWidth` across.
+    static func contentWidth(in pageWidth: CGFloat) -> CGFloat {
+        min(pageWidth, maxWidth) - 2 * padding
+    }
+
     var body: some View {
         ScrollView {
             content
                 // Full column width even when little is listed, so controls at the top stay put.
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(24)
-                .frame(maxWidth: 1080)
+                .padding(Self.padding)
+                .frame(maxWidth: Self.maxWidth)
                 .frame(maxWidth: .infinity)
         }
         .background(Color(nsColor: .windowBackgroundColor))
@@ -202,6 +225,8 @@ struct MoneyText: View {
                 .opacity(0.6)
         }
         .monospacedDigit()
+        // The digits roll to a new amount.
+        .contentTransition(.numericText(value: Double(cents)))
         .lineLimit(1)
         .minimumScaleFactor(0.5)
         .accessibilityElement(children: .ignore)
@@ -209,25 +234,54 @@ struct MoneyText: View {
     }
 }
 
-/// A small colored status tag. Prominent ones are filled solid, for things that need doing.
-struct StatusPill: View {
+/// A row's status at a glance. Paid and scheduled entries, which need nothing from you, get a
+/// symbol: a green check or an amber clock. Anything else gets a word, filled solid when it
+/// needs doing.
+struct StatusMark: View {
     let text: String
     let status: EntryStatus
+    var symbol: String?
     var isProminent = false
 
     var body: some View {
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(isProminent ? (status == .scheduled ? Color.black : Color.white) : status.textColor)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(fill, in: .capsule)
+        Group {
+            if let symbol {
+                Image(systemName: symbol)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(status.textColor)
+                    // The same height as a word, so rows line up either way.
+                    .frame(width: 28, height: 22)
+            } else {
+                Text(text)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isProminent ? (status == .scheduled ? Color.black : Color.white) : status.textColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(fill, in: .capsule)
+            }
+        }
+        // "Unpaid" blends into a check rather than swapping.
+        .contentTransition(.interpolate)
     }
 
     private var fill: Color {
         guard isProminent else { return status.color.opacity(0.15) }
         return status == .scheduled ? .yellow : Theme.alertFill
     }
+}
+
+/// A text link in Mint's green, for "See all" and the like. The system link style is blue.
+struct AccentLinkStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Color.accentColor)
+            .opacity(configuration.isPressed ? 0.6 : 1)
+            .contentShape(.rect)
+    }
+}
+
+extension ButtonStyle where Self == AccentLinkStyle {
+    static var accentLink: AccentLinkStyle { AccentLinkStyle() }
 }
 
 /// A label and amount over a `Bar`.

@@ -58,8 +58,8 @@ struct LedgerTests {
 
     @Test func projectsScheduledEntriesAndUnpaidBills() {
         // Unpaid bills count on their due date (overdue ones today); the dateless loan is left out.
-        #expect(ledger.projectedBalance(on: day(2026, 10, 31), all) == 2_650_00)
-        #expect(ledger.projectedBalance(on: day(2026, 11, 30), all) == 1_150_00)
+        #expect(ledger.dailyBalances(all, from: day(2026, 10, 31), through: day(2026, 10, 31)).last?.cents == 2_650_00)
+        #expect(ledger.dailyBalances(all, from: day(2026, 11, 30), through: day(2026, 11, 30)).last?.cents == 1_150_00)
     }
 
     @Test func forecastRunsInDateOrderWithARunningBalance() {

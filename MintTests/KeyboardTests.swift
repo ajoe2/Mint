@@ -159,9 +159,7 @@ struct KeyboardTests {
         #expect(app.transactionFilter == .kind(.income))
         transactions.close()
 
-        let suite = "com.ajoe.Mint.tests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = testDefaults("statistics-period")
         let (_, _, statistics, pressInStatistics) = try appWindow(showing: .statistics, defaults: defaults)
         defer { statistics.close() }
         pressInStatistics(right, 124)

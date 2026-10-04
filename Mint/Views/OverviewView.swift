@@ -10,16 +10,21 @@ import SwiftUI
 
 /// The home screen: how much you have, where it's heading, and what's coming up.
 struct OverviewView: View {
-    let entries: [Entry]
+    let entries: [LedgerEntry]
     let ledger: Ledger
 
     @Environment(AppModel.self) private var app
     @AppStorage(SettingsKey.lowBalanceLimit) private var lowBalanceLimit = ReminderSettings.standard.limitCents
     @State private var selection = RowSelection()
+    /// Coming up and This month side by side, or stacked when there isn't room.
+    @State private var isWide = true
 
     /// Days the chart shows before and after today.
     private static let chartDaysBack = 30
     private static let chartDaysAhead = 90
+    /// Coming up goes beside This month only when it gets at least this much room.
+    private static let comingUpMinWidth: CGFloat = 420
+    private static let thisMonthWidth: CGFloat = 340
 
     var body: some View {
         let today = ledger.today
@@ -46,8 +51,7 @@ struct OverviewView: View {
                     lowest: lowest,
                     isLow: lowest.cents < lowBalanceLimit,
                     points: points,
-                    ledger: ledger,
-                    onAdjust: { app.isAdjustingBalance = true }
+                    ledger: ledger
                 )
 
                 if lowest.cents < lowBalanceLimit {
@@ -60,26 +64,28 @@ struct OverviewView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
                     .background(Color.red.opacity(0.1), in: .rect(cornerRadius: 12, style: .continuous))
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
                 if !overdue.isEmpty {
-                    OverdueSection(entries: overdue, ledger: ledger)
+                    OverdueSection(entries: overdue.map(\.entry), ledger: ledger)
                 }
 
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 20) {
-                        comingUpSection(comingUp)
-                        ThisMonthCard(entries: entries, ledger: ledger)
-                            .frame(width: 340)
-                    }
-                    VStack(spacing: 20) {
-                        comingUpSection(comingUp)
-                        ThisMonthCard(entries: entries, ledger: ledger)
-                    }
+                // One layout or the other, so each section is built once.
+                let layout = isWide ? AnyLayout(HStackLayout(alignment: .top, spacing: 20)) : AnyLayout(VStackLayout(spacing: 20))
+                layout {
+                    comingUpSection(comingUp)
+                    ThisMonthCard(entries: entries, ledger: ledger)
+                        .frame(width: isWide ? Self.thisMonthWidth : nil)
                 }
             }
         }
-        .keyboardRows(overdue + comingUp.map(\.item), selection: selection, ledger: ledger)
+        // Measured on the page, which is as wide as the window, so the page itself never has to
+        // be wider than the window for the columns to fit side by side.
+        .onGeometryChange(for: Bool.self) {
+            Page<EmptyView>.contentWidth(in: $0.size.width) >= Self.comingUpMinWidth + 20 + Self.thisMonthWidth
+        } action: { isWide = $0 }
+        .keyboardRows((overdue + comingUp.map(\.item)).map(\.entry), selection: selection, ledger: ledger)
     }
 
     /// "Your balance is projected to drop to $320.00 on Oct 14, 2026, below your $500.00 limit."
@@ -91,10 +97,10 @@ struct OverviewView: View {
         return text + "."
     }
 
-    private func comingUpSection(_ steps: [ForecastStep<Entry>]) -> some View {
+    private func comingUpSection(_ steps: [ForecastStep<LedgerEntry>]) -> some View {
         TitledSection("Coming up") {
             Button("See all") { app.selection = .transactions }
-                .buttonStyle(.link)
+                .buttonStyle(.accentLink)
         } content: {
             if steps.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
@@ -111,12 +117,11 @@ struct OverviewView: View {
                 }
                 .card()
             } else {
-                RowCard(items: steps, id: \.item.persistentModelID) { step in
-                    EntryRowView(entry: step.item, ledger: ledger, balanceAfter: step.balanceAfter)
+                RowCard(items: steps, id: \.item.id) { step in
+                    EntryRowView(entry: step.item.entry, ledger: ledger, balanceAfter: step.balanceAfter)
                 }
             }
         }
-        .frame(minWidth: 420)
     }
 }
 
@@ -151,7 +156,7 @@ struct OverdueSection: View {
     }
 }
 
-/// The balance, where it's heading, and a slim chart.
+/// The balance, where it's heading in one line, and a slim chart.
 private struct BalancePanel: View {
     let balance: Int
     let inFourWeeks: Int
@@ -160,36 +165,16 @@ private struct BalancePanel: View {
     let isLow: Bool
     let points: [BalancePoint]
     let ledger: Ledger
-    let onAdjust: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 36) {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 8) {
-                        Text("Balance")
-                            .foregroundStyle(.secondary)
-                        Button("Adjust…", action: onAdjust)
-                            .buttonStyle(.link)
-                            .help("Set your balance to what your bank shows (⇧⌘B)")
-                    }
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Balance")
                     .font(.subheadline.weight(.medium))
-                    MoneyText(cents: balance, size: 38)
-                        .foregroundStyle(balance < 0 ? Theme.unpaidText : Color.primary)
-                        .contentTransition(.numericText())
-                }
-                Spacer()
-                Stat(
-                    title: "In 4 weeks",
-                    value: Money.format(inFourWeeks),
-                    detail: inFourWeeks == balance ? "No change" : Money.format(inFourWeeks - balance, showPlus: true)
-                )
-                Stat(
-                    title: "Lowest ahead",
-                    value: Money.format(lowest.cents),
-                    detail: DayText.short(lowest.day, today: ledger.today, calendar: ledger.calendar),
-                    isWarning: isLow
-                )
+                    .foregroundStyle(.secondary)
+                MoneyText(cents: balance, size: 38)
+                    .foregroundStyle(balance < 0 ? Theme.unpaidText : Color.primary)
+                outlook
             }
 
             // Mark the low point only if it's below today's balance.
@@ -199,35 +184,31 @@ private struct BalancePanel: View {
         .card()
     }
 
-    private struct Stat: View {
-        let title: String
-        let value: String
-        let detail: String
-        var isWarning = false
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .font(.system(.title3, design: .rounded).weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(isWarning ? Theme.unpaidText : Color.primary)
-                    .contentTransition(.numericText())
-                Text(detail)
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-            }
-            .accessibilityElement(children: .combine)
-        }
+    /// "In 4 weeks $12,808.90 (+$3,510.61) · Lowest $9,068.90 (Oct 12)"
+    private var outlook: some View {
+        let change = inFourWeeks - balance
+        let lowestDay = DayText.short(lowest.day, today: ledger.today, calendar: ledger.calendar)
+        return (
+            Text("In 4 weeks ").foregroundStyle(.secondary)
+            + Text(Money.format(inFourWeeks)).fontWeight(.semibold)
+            + Text(change == 0 ? "" : " (\(Money.format(change, showPlus: true)))").foregroundStyle(.secondary)
+            + Text("  ·  ").foregroundStyle(.tertiary)
+            + Text("Lowest ").foregroundStyle(.secondary)
+            + Text(Money.format(lowest.cents)).fontWeight(.semibold).foregroundStyle(isLow ? Theme.unpaidText : Color.primary)
+            + Text(" (\(lowestDay))").foregroundStyle(.secondary)
+        )
+        .font(.callout)
+        .monospacedDigit()
+        .lineLimit(1)
+        .contentTransition(.numericText())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("In 4 weeks \(Money.format(inFourWeeks)), lowest ahead \(Money.format(lowest.cents)) on \(lowestDay)")
     }
 }
 
 /// This month so far, what's still expected before it ends, and the top spending categories.
 private struct ThisMonthCard: View {
-    let entries: [Entry]
+    let entries: [LedgerEntry]
     let ledger: Ledger
 
     var body: some View {

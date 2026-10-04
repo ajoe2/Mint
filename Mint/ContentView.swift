@@ -19,11 +19,13 @@ struct ContentView: View {
 
     /// Updated when the day changes, so scheduled entries become paid on their date.
     @State private var today = Calendar.current.startOfDay(for: .now)
-    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         @Bindable var app = app
         let ledger = Ledger(checkpoints: adjustments.map(\.checkpoint), today: today)
+        // Copied once per change to the data. Switching tabs and searching happen in `MainView`,
+        // so they don't redo this.
+        let items = entries.map { LedgerEntry($0) }
 
         Group {
             // With no balance yet, the welcome screen fills the window. It isn't a sheet, so it
@@ -35,16 +37,17 @@ struct ContentView: View {
                     .background(Color(nsColor: .windowBackgroundColor))
                     .toolbar(removing: .title)
             } else {
-                main(ledger: ledger)
+                MainView(entries: items, adjustments: adjustments, ledger: ledger)
             }
         }
+        // Whatever changes the data, whether an edit, Undo, a new balance or a new day, the rows,
+        // amounts, bars and chart move to match it.
+        .animation(Motion.standard, value: items)
+        .animation(Motion.standard, value: ledger)
         .sheet(item: $app.editor) { route in
             if route.isAvailable {
                 EntryEditor(route: route, ledger: ledger, categories: categorySuggestions)
             }
-        }
-        .sheet(isPresented: $app.isAdjustingBalance) {
-            AdjustBalanceView(ledger: ledger, entries: entries, adjustments: adjustments)
         }
         .onChange(of: adjustments.isEmpty, initial: true) { _, isEmpty in
             app.isSettingUp = isEmpty
@@ -77,13 +80,46 @@ struct ContentView: View {
         .task(id: today) {
             Scheduler.extendAll(in: modelContext, today: today)
         }
-        .schedulesReminders(for: entries, ledger: ledger)
+        .schedulesReminders(for: items, ledger: ledger)
     }
 
-    private func main(ledger: Ledger) -> some View {
+    private func refreshToday() {
+        let now = Calendar.current.startOfDay(for: .now)
+        if now != today { today = now }
+    }
+
+    /// Category suggestions per kind: ones in use (most used first), then the unused defaults.
+    private var categorySuggestions: [EntryKind: [String]] {
+        var suggestions: [EntryKind: [String]] = [:]
+        for kind in EntryKind.allCases {
+            var counts: [String: Int] = [:]
+            for entry in entries where entry.kind == kind && !entry.category.isEmpty {
+                counts[entry.category, default: 0] += 1
+            }
+            let used = counts
+                .sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
+                .map(\.key)
+            suggestions[kind] = used + kind.defaultCategories.filter { !used.contains($0) }
+        }
+        return suggestions
+    }
+}
+
+/// The tabs, toolbar and search. Kept apart from `ContentView` so tab switches and keystrokes
+/// update only this, not the copies of the data.
+private struct MainView: View {
+    let entries: [LedgerEntry]
+    let adjustments: [BalanceAdjustment]
+    let ledger: Ledger
+
+    @Environment(AppModel.self) private var app
+    @FocusState private var isSearchFocused: Bool
+
+    var body: some View {
         @Bindable var app = app
-        return NavigationStack {
-            Group {
+        NavigationStack {
+            // A ZStack, not a Group, so the fade below covers the screen coming in, too.
+            ZStack {
                 switch app.selection {
                 case .overview:
                     OverviewView(entries: entries, ledger: ledger)
@@ -93,18 +129,22 @@ struct ContentView: View {
                     StatisticsView(entries: entries, adjustments: adjustments, ledger: ledger)
                 }
             }
+            // Clicks and every shortcut fade from one tab to the next.
+            .animation(Motion.fade, value: app.selection)
             .frame(minWidth: 760, minHeight: 520)
             .toolbar(removing: .title)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Picker("Section", selection: $app.selection) {
-                        ForEach(Screen.allCases) { screen in
-                            Text(screen.title).tag(screen)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
+                    // Mint's own selector, not the system one, so the highlight slides when a
+                    // shortcut changes the tab, not only when it's clicked. ⌘1–⌘3 already move
+                    // between tabs, so it stays out of the Tab order.
+                    ChoiceBar(
+                        label: "Section",
+                        choices: Screen.allCases.map { .init(value: $0, title: $0.title) },
+                        selection: $app.selection,
+                        isFocusable: false
+                    )
+                    .animation(Motion.quick, value: app.selection)
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button("Add Entry", systemImage: "plus") {
@@ -127,27 +167,6 @@ struct ContentView: View {
             .onChange(of: app.searchFocusRequest) { isSearchFocused = true }
             .background { TabShortcuts() }
         }
-    }
-
-    private func refreshToday() {
-        let now = Calendar.current.startOfDay(for: .now)
-        if now != today { today = now }
-    }
-
-    /// Category suggestions per kind: ones in use (most used first), then the unused defaults.
-    private var categorySuggestions: [EntryKind: [String]] {
-        var suggestions: [EntryKind: [String]] = [:]
-        for kind in EntryKind.allCases {
-            var counts: [String: Int] = [:]
-            for entry in entries where entry.kind == kind && !entry.category.isEmpty {
-                counts[entry.category, default: 0] += 1
-            }
-            let used = counts
-                .sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
-                .map(\.key)
-            suggestions[kind] = used + kind.defaultCategories.filter { !used.contains($0) }
-        }
-        return suggestions
     }
 }
 

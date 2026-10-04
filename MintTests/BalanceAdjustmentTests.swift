@@ -52,7 +52,7 @@ struct BalanceAdjustmentTests {
         #expect(ledger.currentBalance([paycheck, groceries, coffee, rent, paidPhone]) == 2_790_00)
 
         // Projections start from the adjusted balance.
-        #expect(ledger.projectedBalance(on: day(2026, 11, 30), items) == 2_850_00 - 60_00 - 1_500_00)
+        #expect(ledger.dailyBalances(items, from: day(2026, 11, 30), through: day(2026, 11, 30)).last?.cents == 2_850_00 - 60_00 - 1_500_00)
     }
 
     @Test func entriesBeforeTheAdjustmentAreHistory() {
@@ -180,9 +180,7 @@ struct BalanceAdjustmentStoreTests {
 struct AppResetTests {
     @Test func erasesAllDataAndSettings() throws {
         let context = try makeContext()
-        let suite = "com.ajoe.Mint.tests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = testDefaults("reset")
         defaults.set("year", forKey: SettingsKey.statsPeriod)
         defaults.set(500_00, forKey: SettingsKey.lowBalanceLimit)
 

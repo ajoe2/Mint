@@ -8,7 +8,7 @@
 import SwiftUI
 
 /// Status (unpaid, scheduled, paid), its date, and the due date. Used by the entry editor and the
-/// popover on a row's status label.
+/// popover on a row's status mark.
 struct WhenSection: View {
     @Binding var draft: EntryDraft
     let ledger: Ledger
@@ -19,7 +19,7 @@ struct WhenSection: View {
         Binding {
             draft.status(today: ledger.today, calendar: ledger.calendar)
         } set: { newValue in
-            withAnimation { draft.setStatus(newValue, today: ledger.today, calendar: ledger.calendar) }
+            withAnimation(Motion.standard) { draft.setStatus(newValue, today: ledger.today, calendar: ledger.calendar) }
         }
     }
 
@@ -56,7 +56,7 @@ struct WhenSection: View {
                         DatePicker("Due date", selection: $draft.dueDate, displayedComponents: .date)
                             .labelsHidden()
                         Button("Remove Due Date", systemImage: "xmark.circle.fill") {
-                            withAnimation { draft.hasDueDate = false }
+                            withAnimation(Motion.standard) { draft.hasDueDate = false }
                         }
                         .labelStyle(.iconOnly)
                         .buttonStyle(.borderless)
@@ -66,7 +66,7 @@ struct WhenSection: View {
                     }
                 } else {
                     Button("Add") {
-                        withAnimation { draft.hasDueDate = true }
+                        withAnimation(Motion.standard) { draft.hasDueDate = true }
                     }
                     .buttonStyle(.borderless)
                     .keyboardShortcut(Self.dueDateShortcut)

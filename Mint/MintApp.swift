@@ -54,15 +54,7 @@ struct MintApp: App {
         .modelContainer(sharedModelContainer)
         .defaultSize(width: 1100, height: 780)
         .commands {
-            CommandGroup(replacing: .newItem) {
-                Group {
-                    Button("New Entry…") { app.editor = .new(app.newEntryKind) }
-                        .keyboardShortcut("n")
-                    Button("Adjust Balance…") { app.isAdjustingBalance = true }
-                        .keyboardShortcut("b", modifiers: [.command, .shift])
-                }
-                .disabled(!app.isBrowsing)
-            }
+            FileCommands(app: app)
             CommandGroup(replacing: .sidebar) {
                 // Off during setup or while a sheet is open, so ⌘1–⌘4 can pick the kind in the entry editor.
                 Group {
@@ -99,6 +91,27 @@ struct MintApp: App {
             ShortcutsView()
         }
         .windowResizability(.contentSize)
+    }
+}
+
+/// File ▸ New Entry, and Adjust Balance, which opens Settings to set it there.
+struct FileCommands: Commands {
+    let app: AppModel
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            Group {
+                Button("New Entry…") { app.editor = .new(app.newEntryKind) }
+                    .keyboardShortcut("n")
+                Button("Adjust Balance…") {
+                    openSettings()
+                    app.isAdjustingBalance = true
+                }
+                .keyboardShortcut("b", modifiers: [.command, .shift])
+            }
+            .disabled(!app.isBrowsing)
+        }
     }
 }
 

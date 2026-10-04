@@ -9,8 +9,8 @@ import AppKit
 import SwiftData
 import SwiftUI
 
-/// One entry: icon, name, detail line, status pill and amount. Click to edit, right-click for
-/// quick actions, or click the pill to change the status and dates.
+/// One entry: icon, name, detail line, status mark and amount. Click to edit, right-click for
+/// quick actions, or click the status mark to change the status and dates.
 struct EntryRowView<Trailing: View>: View {
     let entry: Entry
     let ledger: Ledger
@@ -23,6 +23,9 @@ struct EntryRowView<Trailing: View>: View {
     @Environment(RowSelection.self) private var selection: RowSelection?
     @State private var isHovering = false
     @State private var isShowingStatusAlone = false
+
+    /// Room for amounts up to six figures.
+    private static var amountWidth: CGFloat { 108 }
 
     init(entry: Entry, ledger: Ledger, balanceAfter: Int? = nil, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
         self.entry = entry
@@ -57,7 +60,7 @@ struct EntryRowView<Trailing: View>: View {
     }
 
     var body: some View {
-        let pill = Pill(entry: entry, ledger: ledger)
+        let mark = StatusMarkContent(entry: entry, ledger: ledger)
         HStack(spacing: 12) {
             KindIcon(kind: entry.kind, category: entry.category)
             VStack(alignment: .leading, spacing: 2) {
@@ -81,11 +84,11 @@ struct EntryRowView<Trailing: View>: View {
             Button {
                 isChangingStatus.wrappedValue = true
             } label: {
-                StatusPill(text: pill.text, status: pill.status, isProminent: pill.isProminent)
-                    .contentShape(.capsule)
+                StatusMark(text: mark.text, status: mark.status, symbol: mark.symbol, isProminent: mark.isProminent)
+                    .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .help("\(pill.help). Click to change.")
+            .help("\(mark.help). Click to change.")
             .popover(isPresented: isChangingStatus, arrowEdge: .bottom) {
                 StatusPopover(entry: entry, ledger: ledger)
             }
@@ -99,6 +102,8 @@ struct EntryRowView<Trailing: View>: View {
                         .help("Your balance after this")
                 }
             }
+            // One width for every amount, so the status marks line up down the list.
+            .frame(minWidth: Self.amountWidth, alignment: .trailing)
             trailing
         }
         .padding(.horizontal, 14)
@@ -117,7 +122,7 @@ struct EntryRowView<Trailing: View>: View {
         .contextMenu { actions.menu(for: entry) }
         .id(entry.persistentModelID)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel(pill))
+        .accessibilityLabel(accessibilityLabel(mark))
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { actions.edit(entry) }
         .accessibilityAction(named: "Change Status") { isChangingStatus.wrappedValue = true }
@@ -142,8 +147,8 @@ struct EntryRowView<Trailing: View>: View {
     }
 
     /// The whole row as one VoiceOver sentence.
-    private func accessibilityLabel(_ pill: Pill) -> String {
-        var parts = [entry.title, Money.format(entry.signedCents, showPlus: true), detail, pill.text]
+    private func accessibilityLabel(_ mark: StatusMarkContent) -> String {
+        var parts = [entry.title, Money.format(entry.signedCents, showPlus: true), detail, mark.text]
         if let balanceAfter {
             parts.append("balance after, \(Money.format(balanceAfter))")
         }
@@ -151,11 +156,13 @@ struct EntryRowView<Trailing: View>: View {
     }
 }
 
-/// A row's status pill: red (unpaid), yellow (scheduled) or green (paid). When something needs
-/// doing, it's filled and says why.
-private struct Pill {
+/// What a row's status mark shows. Paid is a green check and scheduled an amber clock; the
+/// date beside the name says when. Unpaid says so in red, filled solid with the reason when
+/// something needs doing.
+private struct StatusMarkContent {
     var text: String
     var status: EntryStatus
+    var symbol: String?
     var isProminent = false
     var help: String
 
@@ -175,16 +182,21 @@ private struct Pill {
             help = "Scheduled for after its due date"
         } else {
             text = status.label(for: entry.kind)
-            help = switch status {
-            case .unpaid: "Nothing is scheduled yet, so it doesn't change your balance"
-            case .scheduled: "Counts as \(entry.kind.completedLabel.lowercased()) automatically on its date"
-            case .paid: "Counts toward your balance"
+            switch status {
+            case .unpaid:
+                help = "Nothing is scheduled yet, so it doesn't change your balance"
+            case .scheduled:
+                symbol = "clock"
+                help = "\(text): counts as \(entry.kind.completedLabel.lowercased()) automatically on its date"
+            case .paid:
+                symbol = "checkmark.circle.fill"
+                help = "\(text): counts toward your balance"
             }
         }
     }
 }
 
-/// The status, date and due date fields from the editor, opened from a row's pill. Saves on
+/// The status, date and due date fields from the editor, opened from a row's status mark. Saves on
 /// close, so the row stays put while you pick dates.
 private struct StatusPopover: View {
     let entry: Entry
@@ -222,7 +234,7 @@ private struct StatusPopover: View {
         guard entry.modelContext != nil, !entry.isDeleted else { return }
         let dates = draft.storedDates(for: entry, calendar: ledger.calendar)
         guard dates.date != entry.date || dates.dueDate != entry.dueDate else { return }
-        withAnimation {
+        withAnimation(Motion.standard) {
             entry.date = dates.date
             entry.dueDate = dates.dueDate
         }

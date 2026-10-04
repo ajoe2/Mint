@@ -169,7 +169,7 @@ struct EntryEditor: View {
             }
 
             if draft.frequency != nil {
-                Toggle("End repeat", isOn: $draft.hasEndDate.animation())
+                Toggle("End repeat", isOn: $draft.hasEndDate.animation(Motion.standard))
                 if draft.hasEndDate {
                     DatePicker("Ends", selection: $draft.endDate, displayedComponents: .date)
                 }
@@ -194,7 +194,7 @@ struct EntryEditor: View {
         Binding {
             draft.frequency
         } set: { newValue in
-            withAnimation {
+            withAnimation(Motion.standard) {
                 draft.frequency = newValue
                 if newValue != nil && !draft.canRepeat {
                     draft.hasDueDate = true

@@ -131,7 +131,7 @@ private struct KeyboardRows: ViewModifier {
     private func select(_ id: PersistentIdentifier, proxy: ScrollViewProxy) {
         selection.selected = id
         isFocused = true
-        withAnimation(.snappy(duration: 0.2)) { proxy.scrollTo(id) }
+        withAnimation(Motion.quick) { proxy.scrollTo(id) }
     }
 
     private func perform(_ action: (SelectedEntry) -> Void) -> KeyPress.Result {

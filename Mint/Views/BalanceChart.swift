@@ -8,12 +8,12 @@
 import Charts
 import SwiftUI
 
-/// A slim balance chart: solid for the past, dashed for the projection, with today and the lowest
-/// point ahead marked. Hover to see any day's balance.
+/// A slim balance chart: solid for the past, dashed for the projection, with today marked and a
+/// dot on the lowest point ahead. Hover to see any day's balance.
 struct BalanceChart: View {
     let points: [BalancePoint]
     let today: Date
-    /// The lowest point ahead, when it's worth pointing out.
+    /// The lowest point ahead, marked with a dot. The amount is on the line above the chart.
     var lowest: BalancePoint?
 
     @State private var selectedDay: Date?
@@ -91,14 +91,6 @@ struct BalanceChart: View {
                 )
                 .foregroundStyle(lowest.cents < 0 ? Theme.unpaidText : Color.accentColor)
                 .symbolSize(36)
-                .annotation(position: .bottom, spacing: 3, overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
-                    if selectedPoint == nil {
-                        Text("Low \(Money.format(lowest.cents))")
-                            .font(.caption2.weight(.medium))
-                            .monospacedDigit()
-                            .foregroundStyle(lowest.cents < 0 ? Theme.unpaidText : Color.secondary)
-                    }
-                }
             }
 
             if points.contains(where: { $0.cents < 0 }) {

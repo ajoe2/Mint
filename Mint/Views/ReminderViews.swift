@@ -23,13 +23,14 @@ struct ReminderPreferences: DynamicProperty {
 
 extension View {
     /// Keeps scheduled reminders in step with the entries and reminder settings.
-    func schedulesReminders(for entries: [Entry], ledger: Ledger) -> some View {
-        modifier(ReminderScheduling(entries: entries, ledger: ledger))
+    func schedulesReminders(for entries: [LedgerEntry], ledger: Ledger) -> some View {
+        background { ReminderScheduling(entries: entries, ledger: ledger).equatable() }
     }
 }
 
-private struct ReminderScheduling: ViewModifier {
-    let entries: [Entry]
+/// A view of its own, so planning reruns only when the entries, balances or settings change.
+private struct ReminderScheduling: View, Equatable {
+    let entries: [LedgerEntry]
     let ledger: Ledger
 
     /// `nil` in tests and demo mode, which never send reminders.
@@ -42,9 +43,13 @@ private struct ReminderScheduling: ViewModifier {
         var isTurnedOff: Bool
     }
 
-    func body(content: Content) -> some View {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.ledger == rhs.ledger && lhs.entries == rhs.entries
+    }
+
+    var body: some View {
         let plan = center == nil ? [] : ReminderPlanner.plan(entries: entries, ledger: ledger, settings: preferences.settings)
-        content
+        Color.clear
             // Also reruns when notifications are turned on or off in System Settings.
             .task(id: Inputs(plan: plan, isTurnedOff: center?.isTurnedOff == true)) {
                 await center?.schedule(plan)
@@ -63,18 +68,18 @@ struct ReminderSettingsSection: View {
     var body: some View {
         Section {
             Toggle(isOn: preferences.$dueDates) {
-                Text("Due dates")
-                Text("Before something unpaid is due, and again if it's overdue.")
+                Text("Bills due")
+                Text("Before they're due, and again if overdue.")
             }
             Toggle(isOn: preferences.$lowBalance) {
                 Text("Low balance")
-                Text("Before your balance is expected to drop below the limit.")
+                Text("Before your balance drops below the limit.")
             }
             LabeledContent {
                 AmountSettingField(cents: preferences.$limitCents)
             } label: {
-                Text("Limit")
-                Text("The Overview warns you below this, too.")
+                Text("Low balance limit")
+                Text("The Overview warns you below it, too.")
             }
             LabeledContent("Remind me") {
                 HStack(spacing: 8) {

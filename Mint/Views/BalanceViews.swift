@@ -195,10 +195,12 @@ struct AdjustBalanceView: View {
     }
 }
 
-/// The Settings window: reminders, balance history, and a way to start over.
+/// The Settings window: the balance, reminders, and a way to start over.
 struct SettingsView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.modelContext) private var context
+    @Query(sort: \Entry.createdAt) private var entries: [Entry]
+    /// Newest first.
     @Query(sort: [
         SortDescriptor(\BalanceAdjustment.day, order: .reverse),
         SortDescriptor(\BalanceAdjustment.createdAt, order: .reverse),
@@ -208,72 +210,36 @@ struct SettingsView: View {
     @State private var pendingDeletion: BalanceAdjustment?
     @State private var isConfirmingReset = false
 
-    /// "starting balance" or "manual adjustment", for the delete dialog. The main window can
-    /// replace the balance while the dialog is open, so check it still exists.
+    /// "starting balance" or "manual adjustment", for the delete dialog. The balance can be
+    /// replaced while the dialog is open, so check it still exists.
     private var pendingTitle: String {
         guard let pendingDeletion, pendingDeletion.modelContext != nil else { return "balance" }
         return pendingDeletion.title.lowercased()
     }
 
+    private var ledger: Ledger {
+        Ledger(checkpoints: adjustments.map(\.checkpoint), today: .now)
+    }
+
     var body: some View {
+        @Bindable var app = app
         Form {
+            balanceSection
             ReminderSettingsSection()
-
-            Section {
-                if adjustments.isEmpty {
-                    Text("No balance has been set yet.")
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(adjustments) { adjustment in
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(adjustment.title)
-                            Text(DayText.full(adjustment.day))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(Money.format(adjustment.amountCents))
-                                .monospacedDigit()
-                            if let change = adjustment.changeCents {
-                                Text(Money.format(change, showPlus: true))
-                                    .font(.caption)
-                                    .monospacedDigit()
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        if adjustments.count > 1 {
-                            Button("Delete", systemImage: "trash") {
-                                pendingDeletion = adjustment
-                            }
-                            .labelStyle(.iconOnly)
-                            .buttonStyle(.borderless)
-                            .help("Delete")
-                        }
-                    }
-                }
-            } header: {
-                Text("Balance History")
-            } footer: {
-                Text("Your balance counts from the most recent one. To set it again, choose File ▸ Adjust Balance… (⇧⌘B).")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
             Section {
                 LabeledContent {
                     Button("Reset…", role: .destructive) { isConfirmingReset = true }
                 } label: {
-                    Text("Reset Mint")
-                    Text("Erases every entry, balance and setting, and starts over.")
+                    Text("Start over")
+                    Text("Erases every entry, balance and setting.")
                 }
-            } header: {
-                Text("Reset")
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 600)
+        .frame(width: 460, height: 500)
+        .sheet(isPresented: $app.isAdjustingBalance) {
+            AdjustBalanceView(ledger: ledger, entries: entries, adjustments: adjustments)
+        }
         .confirmationDialog(
             "Delete this \(pendingTitle)?",
             isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
@@ -300,6 +266,71 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("All of your entries, repeating entries, balances and settings will be permanently deleted. This can't be undone.")
+        }
+    }
+
+    /// What your balance is now, a way to set it to what the bank shows, and every balance set before.
+    private var balanceSection: some View {
+        Section {
+            LabeledContent {
+                HStack(spacing: 12) {
+                    if !adjustments.isEmpty {
+                        Text(Money.format(ledger.currentBalance(entries)))
+                            .monospacedDigit()
+                    }
+                    Button("Adjust…") { app.isAdjustingBalance = true }
+                        // Not while the main window is setting up or editing an entry.
+                        .disabled(app.isSettingUp || app.editor != nil)
+                        .help("Set your balance to what your bank shows (⇧⌘B)")
+                }
+            } label: {
+                Text("Current balance")
+                if let latest = adjustments.first {
+                    // Your balance counts from the most recent one.
+                    Text("Last set \(DayText.full(latest.day)).")
+                }
+            }
+
+            if !adjustments.isEmpty {
+                DisclosureGroup("History") {
+                    ForEach(adjustments) { adjustment in
+                        historyRow(adjustment)
+                    }
+                }
+            }
+        } header: {
+            Text("Balance")
+        }
+    }
+
+    private func historyRow(_ adjustment: BalanceAdjustment) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(adjustment.title)
+                Text(DayText.full(adjustment.day))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(Money.format(adjustment.amountCents))
+                    .monospacedDigit()
+                if let change = adjustment.changeCents {
+                    Text(Money.format(change, showPlus: true))
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+            // The only balance can't be deleted; there'd be nothing to count from.
+            if adjustments.count > 1 {
+                Button("Delete", systemImage: "trash") {
+                    pendingDeletion = adjustment
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .help("Delete")
+            }
         }
     }
 }

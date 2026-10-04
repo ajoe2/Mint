@@ -69,19 +69,17 @@ enum Screen: String, CaseIterable, Identifiable {
     }
 }
 
-/// What Transactions shows: everything, one kind, or only balance adjustments.
+/// What Transactions shows: everything (balance adjustments included), or one kind.
 enum TransactionFilter: Hashable {
     case all
     case kind(EntryKind)
-    case adjustments
 
-    static let allCases: [TransactionFilter] = [.all] + EntryKind.allCases.map(Self.kind) + [.adjustments]
+    static let allCases: [TransactionFilter] = [.all] + EntryKind.allCases.map(Self.kind)
 
     var title: String {
         switch self {
         case .all: "All"
         case .kind(let kind): kind.pluralTitle
-        case .adjustments: "Adjustments"
         }
     }
 

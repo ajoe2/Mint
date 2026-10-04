@@ -24,7 +24,7 @@ struct ReminderTests {
 
     private func plan(_ entries: [Entry], balance: Int = 1_000_00, settings: ReminderSettings? = nil) -> [Reminder] {
         let ledger = Ledger(startingBalanceCents: balance, startDate: today, today: today)
-        return ReminderPlanner.plan(entries: entries, ledger: ledger, settings: settings ?? .standard)
+        return ReminderPlanner.plan(entries: entries.map { LedgerEntry($0) }, ledger: ledger, settings: settings ?? .standard)
     }
 
     private func at(_ date: Date, _ hour: Int, _ minute: Int = 0) -> Date {
