@@ -1,0 +1,9 @@
+# Xcode
+xcuserdata/
+DerivedData/
+build/
+build.noindex/
+*.xcresult
+
+# macOS
+.DS_Store
