@@ -38,7 +38,7 @@ Click an entry to edit it, click its status mark to change the status and dates,
 
 ## Screens
 
-- **Overview:** your balance, where it'll be in four weeks, its lowest point ahead, and a chart from a month ago to three months out (hover for amounts). Below: **Overdue** entries, **Coming up** in the next four weeks with your balance after each, and **This month**.
+- **Overview:** your balance, where it'll be in four weeks, its lowest point ahead, and a chart from a month ago to three months out, dotted where it's projected and red below your low-balance limit. Hover over the chart to see the balance on any day, compared with today's. Below: **Overdue** entries, **Coming up** in the next four weeks with your balance after each, and **This month**.
 - **Transactions:** everything in one list: overdue, coming up, undated, then past months. Filter by kind at the top; adjustments show under **All**.
 - **Statistics:** totals by kind, net, and spending by category for this month, this year or all time, plus money in and out for the last 12 months.
 

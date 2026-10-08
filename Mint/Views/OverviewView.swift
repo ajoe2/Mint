@@ -52,6 +52,7 @@ struct OverviewView: View {
                     inFourWeeks: inFourWeeks,
                     lowest: lowest,
                     isLow: isLow,
+                    limit: lowBalanceLimit,
                     points: points,
                     ledger: ledger
                 )
@@ -158,32 +159,71 @@ struct OverdueSection: View {
     }
 }
 
-/// The balance, where it's heading in one line, and a slim chart.
+/// The balance, where it's heading in one line, and a chart. Hovering over the chart shows the
+/// balance on that day instead.
 private struct BalancePanel: View {
     let balance: Int
     let inFourWeeks: Int
     let lowest: BalancePoint
     /// The lowest balance ahead is below the limit set in Settings.
     let isLow: Bool
+    /// The low-balance limit set in Settings.
+    let limit: Int
     let points: [BalancePoint]
     let ledger: Ledger
 
+    /// The day under the pointer in the chart.
+    @State private var hovered: BalancePoint?
+
     var body: some View {
+        // Hovering over any day but today shows that day's balance, compared with today's.
+        let shown = hovered.flatMap { $0.day == ledger.today ? nil : $0 }
+        let cents = shown?.cents ?? balance
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Balance")
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
-                MoneyText(cents: balance, size: 38)
-                    .foregroundStyle(balance < 0 ? Theme.unpaidText : Color.primary)
-                outlook
+                MoneyText(cents: cents, size: 38)
+                    .foregroundStyle(cents < 0 ? Theme.unpaidText : Color.primary)
+                if let shown {
+                    comparison(shown)
+                } else {
+                    outlook
+                }
             }
+            // The digits roll to each day's balance as the pointer moves along the chart.
+            .animation(Motion.quick, value: shown)
 
             // Mark the low point only if it's below today's balance.
-            BalanceChart(points: points, today: ledger.today, lowest: lowest.cents < balance ? lowest : nil)
-                .frame(height: 130)
+            BalanceChart(
+                points: points,
+                ledger: ledger,
+                lowest: lowest.cents < balance ? lowest : nil,
+                limit: limit,
+                selection: $hovered
+            )
+            .frame(height: 180)
         }
         .card()
+    }
+
+    /// "+$825.16 vs. today", for the day under the pointer.
+    private func comparison(_ point: BalancePoint) -> some View {
+        let change = point.cents - balance
+        let amount = Text(Money.format(change, showPlus: true)).fontWeight(.semibold).foregroundStyle(.primary)
+        return Group {
+            if change == 0 {
+                Text("Same as today")
+            } else {
+                Text("\(amount) vs. today")
+            }
+        }
+        .foregroundStyle(.secondary)
+        .font(.callout)
+        .monospacedDigit()
+        .lineLimit(1)
+        .contentTransition(.numericText(value: Double(change)))
     }
 
     /// "In 4 weeks $12,808.90 (+$3,510.61) · Lowest $9,068.90 (Oct 12)"
