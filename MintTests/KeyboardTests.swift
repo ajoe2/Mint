@@ -60,10 +60,15 @@ struct KeyboardTests {
         #expect(shortcuts["Keyboard Shortcuts"] == "⌘?")
     }
 
-    /// A window showing the app with sample data, plus a function that presses keys in it.
-    private func appWindow(showing screen: Screen, defaults: UserDefaults? = nil) throws -> (AppModel, ModelContext, NSWindow, (String, UInt16) -> Void) {
+    /// A window showing the app, plus a function that presses keys in it. It holds the sample data
+    /// unless `insert` adds something else.
+    private func appWindow(
+        showing screen: Screen,
+        defaults: UserDefaults? = nil,
+        insert: @MainActor (ModelContext) -> Void = { SampleData.insert(into: $0, today: .now) }
+    ) throws -> (AppModel, ModelContext, NSWindow, (String, UInt16) -> Void) {
         let context = try makeContext()
-        SampleData.insert(into: context, today: .now)
+        insert(context)
         try context.save()
         let app = AppModel()
         app.selection = screen
@@ -86,12 +91,26 @@ struct KeyboardTests {
         return (app, context, window, press)
     }
 
+    /// A starting balance and three bills: one overdue, then two coming up. The sample data's
+    /// repeats fall on set days of the month, so which of them come before its phone bill depends
+    /// on the date. Nothing comes between these, so the rows are in this order every day.
+    private static func insertBills(into context: ModelContext, today: Date) {
+        let ledger = Ledger(checkpoints: [], today: today)
+        func day(_ offset: Int) -> Date {
+            ledger.addingDays(offset, to: ledger.today)
+        }
+        context.insert(BalanceAdjustment(day: day(-30), amountCents: 2_450_00, baseCents: 2_450_00))
+        context.insert(Entry(kind: .spend, title: "Electric bill", amountCents: 92_40, date: nil, dueDate: day(-2)))
+        context.insert(Entry(kind: .spend, title: "Phone bill", amountCents: 65_00, date: nil, dueDate: day(3)))
+        context.insert(Entry(kind: .spend, title: "Car insurance", amountCents: 640_00, date: day(12), dueDate: day(15)))
+    }
+
     private let down = String(UnicodeScalar(NSDownArrowFunctionKey)!)
     private let right = String(UnicodeScalar(NSRightArrowFunctionKey)!)
 
     /// Sends real key presses to a window showing the app.
     @Test func listsWorkFromTheKeyboard() throws {
-        let (app, context, window, press) = try appWindow(showing: .overview)
+        let (app, context, window, press) = try appWindow(showing: .overview) { Self.insertBills(into: $0, today: .now) }
         defer { window.close() }
 
         // ↓ ↓ ↩ edits the second row: the overdue electric bill comes first.
