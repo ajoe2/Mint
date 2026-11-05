@@ -14,7 +14,8 @@ import SwiftData
 final class AppModel {
     var selection: Screen = .overview
     var editor: EditorRoute?
-    var isAdjustingBalance = false
+    /// Where the Adjust Balance sheet is open, if anywhere.
+    var adjustingBalance: BalanceSheetPlace?
     /// The toolbar search text. Results show in Transactions.
     var searchText = ""
     var transactionFilter = TransactionFilter.all
@@ -27,7 +28,7 @@ final class AppModel {
 
     /// True when the tabs show with no sheet over them, so menu commands can act.
     var isBrowsing: Bool {
-        !isSettingUp && editor == nil && !isAdjustingBalance
+        !isSettingUp && editor == nil && adjustingBalance == nil
     }
 
     /// The kind a new entry starts as: the one Transactions is filtered to, or a spend.
@@ -39,9 +40,30 @@ final class AppModel {
     func reset() {
         selection = .overview
         editor = nil
-        isAdjustingBalance = false
+        adjustingBalance = nil
         searchText = ""
         transactionFilter = .all
+    }
+}
+
+/// The window the Adjust Balance sheet shows in: the main window (Overview and ⇧⌘B) or Settings.
+enum BalanceSheetPlace {
+    case main
+    case settings
+}
+
+extension AppModel {
+    /// Shows or hides the Adjust Balance sheet in `place`, for a sheet's `isPresented`.
+    func isAdjustingBalance(in place: BalanceSheetPlace) -> Bool {
+        adjustingBalance == place
+    }
+
+    func setAdjustingBalance(_ isShown: Bool, in place: BalanceSheetPlace) {
+        if isShown {
+            adjustingBalance = place
+        } else if adjustingBalance == place {
+            adjustingBalance = nil
+        }
     }
 }
 

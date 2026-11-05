@@ -172,6 +172,7 @@ private struct BalancePanel: View {
     let points: [BalancePoint]
     let ledger: Ledger
 
+    @Environment(AppModel.self) private var app
     /// The day under the pointer in the chart.
     @State private var hovered: BalancePoint?
 
@@ -181,9 +182,17 @@ private struct BalancePanel: View {
         let cents = shown?.cents ?? balance
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Balance")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Balance")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    // Matching the bank is the most common correction, so it's here, not only in Settings.
+                    Button("Adjust…") { app.adjustingBalance = .main }
+                        .buttonStyle(.accentLink)
+                        .font(.subheadline)
+                        .help("Set your balance to what your bank shows (⇧⌘B)")
+                }
                 MoneyText(cents: cents, size: 38)
                     .foregroundStyle(cents < 0 ? Theme.unpaidText : Color.primary)
                 if let shown {

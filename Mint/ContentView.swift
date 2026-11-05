@@ -49,6 +49,12 @@ struct ContentView: View {
                 EntryEditor(route: route, ledger: ledger, categories: categorySuggestions)
             }
         }
+        .sheet(isPresented: Binding(
+            get: { app.isAdjustingBalance(in: .main) },
+            set: { app.setAdjustingBalance($0, in: .main) }
+        )) {
+            AdjustBalanceView(ledger: ledger, entries: entries, adjustments: adjustments)
+        }
         .onChange(of: adjustments.isEmpty, initial: true) { _, isEmpty in
             app.isSettingUp = isEmpty
         }
