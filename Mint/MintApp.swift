@@ -90,20 +90,16 @@ struct MintApp: App {
     }
 }
 
-/// File ▸ New Entry, and Adjust Balance, which opens Settings to set it there.
+/// File ▸ New Entry and Adjust Balance, both in the main window.
 struct FileCommands: Commands {
     let app: AppModel
-    @Environment(\.openSettings) private var openSettings
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
             Group {
                 Button("New Entry…") { app.editor = .new(app.newEntryKind) }
                     .keyboardShortcut("n")
-                Button("Adjust Balance…") {
-                    openSettings()
-                    app.isAdjustingBalance = true
-                }
+                Button("Adjust Balance…") { app.adjustingBalance = .main }
                 .keyboardShortcut("b", modifiers: [.command, .shift])
             }
             .disabled(!app.isBrowsing)

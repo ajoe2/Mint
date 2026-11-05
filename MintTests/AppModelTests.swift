@@ -34,11 +34,24 @@ struct AppModelTests {
     @Test func sheetsDontStack() {
         let app = AppModel()
         #expect(app.isBrowsing)
-        app.isAdjustingBalance = true
-        #expect(!app.isBrowsing)
-        app.isAdjustingBalance = false
+        for place in [BalanceSheetPlace.main, .settings] {
+            app.adjustingBalance = place
+            #expect(!app.isBrowsing)
+            app.adjustingBalance = nil
+        }
         app.isSettingUp = true
         #expect(!app.isBrowsing)
+    }
+
+    @Test func balanceSheetShowsOnlyWhereOpened() {
+        let app = AppModel()
+        app.setAdjustingBalance(true, in: .main)
+        #expect(app.isAdjustingBalance(in: .main) && !app.isAdjustingBalance(in: .settings))
+        // Settings closing its (hidden) sheet leaves the main window's open.
+        app.setAdjustingBalance(false, in: .settings)
+        #expect(app.isAdjustingBalance(in: .main))
+        app.setAdjustingBalance(false, in: .main)
+        #expect(app.adjustingBalance == nil)
     }
 
     @Test func everyCategorySymbolExists() {

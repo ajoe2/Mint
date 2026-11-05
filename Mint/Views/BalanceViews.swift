@@ -237,7 +237,10 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 460, height: 500)
-        .sheet(isPresented: $app.isAdjustingBalance) {
+        .sheet(isPresented: Binding(
+            get: { app.isAdjustingBalance(in: .settings) },
+            set: { app.setAdjustingBalance($0, in: .settings) }
+        )) {
             AdjustBalanceView(ledger: ledger, entries: entries, adjustments: adjustments)
         }
         .confirmationDialog(
@@ -278,9 +281,9 @@ struct SettingsView: View {
                         Text(Money.format(ledger.currentBalance(entries)))
                             .monospacedDigit()
                     }
-                    Button("Adjust…") { app.isAdjustingBalance = true }
-                        // Not while the main window is setting up or editing an entry.
-                        .disabled(app.isSettingUp || app.editor != nil)
+                    Button("Adjust…") { app.adjustingBalance = .settings }
+                        // Not while the main window is setting up, editing an entry or adjusting.
+                        .disabled(!app.isBrowsing)
                         .help("Set your balance to what your bank shows (⇧⌘B)")
                 }
             } label: {
